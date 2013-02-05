@@ -312,10 +312,13 @@ static int data_read_input_block_for_row(data_t *d, int row)
 	int err = -1;
 	uint32_t new_row_offset_of_block;
 
-	data_write_input_block(d);
 	new_row_offset_of_block = (row / d->ib.num_rows) * d->ib.num_rows;
-	if ((err = data_read_block_for_row(d, &d->ib, new_row_offset_of_block)))
-		goto out;
+	if (new_row_offset_of_block != d->ib.row_offset)
+	{
+		data_write_input_block(d);
+		if ((err = data_read_block_for_row(d, &d->ib, new_row_offset_of_block)))
+			goto out;
+	}
 	err = 0;
 out:
 	return err;
@@ -436,11 +439,6 @@ static int data_sort(data_t *d, int cols, int *to_sort_cols)
 		if ((err = data_read_input_block_for_row(d,i)))
 			goto out;
 		qsort_r(d->ib.block,rows_to_sort,d->num_bytes_per_row,data_sort_compare_cb,d);
-		if ((err = data_write_input_block(d)))
-		{
-			fprintf(stderr,"Couldn't write block\n");
-			goto out;
-		}
 		i += rows_to_sort;
 	}
 
@@ -448,6 +446,13 @@ static int data_sort(data_t *d, int cols, int *to_sort_cols)
 	k = (d->num_rows + d->ib.num_rows - 1 ) / d->ib.num_rows;
 	if (k > 1)
 	{
+		/* Write possible rest of the cache */
+		if ((err = data_write_input_block(d)))
+		{
+			fprintf(stderr,"Couldn't write block\n");
+			goto out;
+		}
+
 		block_t *in_blocks;
 		int rows_per_in_block = (d->num_rows + k - 1)/k;
 

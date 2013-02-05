@@ -113,7 +113,7 @@ static char *test_data_more_than_a_block(void)
 
 static char *run_test_suite(void)
 {
-//	mu_run_test(test_data_simple);
+	mu_run_test(test_data_simple);
 	mu_run_test(test_data_more_than_a_block);
 	return NULL;
 }
