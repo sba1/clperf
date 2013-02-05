@@ -14,6 +14,8 @@ int tests_run;
  */
 static char *helper_insert_and_assert_data(data_t *d)
 {
+	int i;
+
 	double dv;
 	int32_t iv;
 
@@ -61,12 +63,17 @@ static char *helper_insert_and_assert_data(data_t *d)
 
 	data_sort_v(d,1,1);
 	mu_assert(!data_get_entry_as_double(&dv,d,0,1));
-	printf("dv=%lf\n",dv);
 	mu_assert(dv == 0.01);
 	mu_assert(!data_get_entry_as_double(&dv,d,1,1));
 	mu_assert(dv == 0.08);
 	mu_assert(!data_get_entry_as_double(&dv,d,11,1));
 	mu_assert(dv == 0.68);
+
+	for (i=0;i<12;i++)
+	{
+		mu_assert(!data_get_entry_as_int32(&iv,d,i,3));
+		mu_assert(iv == i);
+	}
 
 	return NULL;
 }
