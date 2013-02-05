@@ -466,7 +466,7 @@ static int data_sort(data_t *d, int cols, int *to_sort_cols)
 
 		memset(in_blocks,0,sizeof(in_blocks[0])*k);
 
-		/* Init in and out buffers */
+		/* Init in buffers */
 		for (i=0;i<k;i++)
 		{
 			if ((err = data_initialize_block(&in_blocks[i],d,32)))
@@ -481,7 +481,7 @@ static int data_sort(data_t *d, int cols, int *to_sort_cols)
 			}
 		}
 
-		FILE *outf = fopen("out2","wb");
+		FILE *sorted_outf = fopen("sorted-out","wb");
 		int m;
 
 		/* Merge */
@@ -516,12 +516,12 @@ static int data_sort(data_t *d, int cols, int *to_sort_cols)
 			}
 
 			block_t *bsk = &in_blocks[sk];
-			printf("m=%d sk=%d %d %d\n",m,sk,ftell(outf),bsk->current_relative_row);
-			fwrite(&bsk->block[bsk->current_relative_row * d->num_bytes_per_row],d->num_bytes_per_row,1,outf);
+			printf("m=%d sk=%d %d %d\n",m,sk,ftell(sorted_outf),bsk->current_relative_row);
+			fwrite(&bsk->block[bsk->current_relative_row * d->num_bytes_per_row],d->num_bytes_per_row,1,sorted_outf);
 			data_advance_head(d,bsk);
 		}
 
-		fclose(outf);
+		fclose(sorted_outf);
 		free(in_blocks);
 
 		if (d->tmp)
@@ -531,7 +531,7 @@ static int data_sort(data_t *d, int cols, int *to_sort_cols)
 		}
 
 		remove(OUTFILE);
-		rename("out2",OUTFILE);
+		rename("sorted-out",OUTFILE);
 
 		if (!(d->tmp = fopen(OUTFILE,"a+")))
 			goto out;
