@@ -350,8 +350,6 @@ static int data_sort_compare_heads_of_blocks(data_t *d, block_t *a, block_t *b)
 	int aoff = a->current_relative_row * d->num_bytes_per_row;
 	int boff = b->current_relative_row * d->num_bytes_per_row;
 
-	printf("%p %p\n",&a->block[aoff], &b->block[boff]);
-
 	if (data_sort_compare_cb(&a->block[aoff], &b->block[boff], d) < 0)
 		return -1;
 	return 1;
