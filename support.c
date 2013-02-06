@@ -517,22 +517,27 @@ static int data_sort(data_t *d, int cols, int *to_sort_cols)
 	if (!(sorted_outf = fopen(sorted_name,"wb")))
 		goto out;
 
-	data_sort_callback(d, cols, to_sort_cols, data_sort_cb, sorted_outf);
+	if ((err = data_sort_callback(d, cols, to_sort_cols, data_sort_cb, sorted_outf)))
+		goto out;
 
 	if (d->tmp)
 	{
 		fclose(d->tmp);
 		d->tmp = NULL;
-	}
-	remove(d->filename);
-	rename(sorted_name,d->filename);
 
-	if (!(d->tmp = fopen(d->filename,"a+")))
-	{
-		fprintf(stderr,"Couldn't open file for appending\n");
-		goto out;
+		fclose(sorted_outf);
+		sorted_outf = NULL;
+
+		remove(d->filename);
+		rename(sorted_name,d->filename);
+
+		if (!(d->tmp = fopen(d->filename,"a+")))
+		{
+			fprintf(stderr,"Couldn't open file for appending\n");
+			goto out;
+		}
+		data_read_block_for_row(d, &d->ib, 0);
 	}
-	data_read_block_for_row(d, &d->ib, 0);
 
 	err = 0;
 out:
@@ -554,6 +559,35 @@ static int data_sort_v(data_t *d, int cols, ...)
 		to_sort_cols[i] = va_arg(vl,int);
 
 	data_sort(d,cols,to_sort_cols);
+out:
+	va_end(vl);
+	return err;
+}
+
+static int data_stat(data_t *d, int label_col, int cols, int *to_sort_cols)
+{
+	int err = -1;
+	if ((err = data_sort(d,cols,to_sort_cols)))
+		goto out;
+	err = 0;
+out:
+	return err;
+}
+
+
+static int data_stat_v(data_t *d, int label_col, int cols, ...)
+{
+	int i;
+	int err = -1;
+	int to_sort_cols[cols];
+
+	va_list vl;
+	va_start(vl,cols);
+
+	for (i=0;i<cols;i++)
+		to_sort_cols[i] = va_arg(vl,int);
+
+	err = data_stat(d, label_col, cols, to_sort_cols);
 out:
 	va_end(vl);
 	return err;
