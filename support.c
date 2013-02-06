@@ -72,6 +72,8 @@ void data_free(data_t *d)
 {
 	if (d)
 	{
+		if (d->tmp)
+			fclose(d->tmp);
 		free(d->column_datatype);
 		free(d->column_offsets);
 		free(d->ib.block);
@@ -477,6 +479,8 @@ static int data_sort_callback(data_t *d, int cols, int *to_sort_cols, int (*call
 			data_advance_head(d,bsk);
 		}
 
+		for (i=0;i<k;i++)
+			free(in_blocks[i].block);
 		free(in_blocks);
 	}
 	err = 0;
