@@ -11,59 +11,6 @@
 
 #define MIN(a,b) ((a)<(b)?(a):(b))
 
-int perf_create(perf_t *out)
-{
-	int rc;
-
-	rc = -1;
-
-	return rc;
-}
-
-
-int perf_set_label_column(perf_t *p, int col)
-{
-	int rc;
-
-	rc = -1;
-
-	return rc;
-}
-
-int perf_set_predictor_column(perf_t *p, int col, int sort_order)
-{
-	int rc;
-
-	rc = -1;
-
-	return rc;
-}
-
-int perf_set_predictor_colulmns(perf_t *p, int ncols, ...)
-{
-	int rc;
-
-	rc = -1;
-
-	return rc;
-}
-
-/**
- * Determine the auroc of the given problem.
- *
- * @param out
- * @param p
- * @return
- */
-int perf_auroc(double *out, perf_t *p)
-{
-	int rc;
-
-	rc = -1;
-
-	return rc;
-}
-
 /**************************************************************/
 
 #define OUTFILE "out"
