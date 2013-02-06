@@ -13,8 +13,6 @@
 
 /**************************************************************/
 
-#define OUTFILE "out"
-
 typedef struct
 {
 	/** Memory allocated for the block */
@@ -63,6 +61,7 @@ int data_create(data_t **out)
 	memset(n,0,sizeof(*n));
 
 	n->ib_bytes = 1024 * 1024;
+	n->filename = "out";
 	*out = n;
 	err = 0;
 out:
@@ -78,6 +77,18 @@ void data_free(data_t *d)
 		free(d->ib.block);
 		free(d);
 	}
+}
+
+/**
+ * Set the name of the external file to be used when storing and
+ * sorting.
+ *
+ * @param d
+ * @param filename
+ */
+void data_set_external_filename(data_t *d, const char *filename)
+{
+	d->filename = filename;
 }
 
 int data_set_number_of_columns(data_t *d, uint32_t cols)
@@ -153,7 +164,7 @@ static int data_write_input_block(data_t *d)
 
 	if (!d->tmp)
 	{
-		if (!(d->tmp = fopen(OUTFILE,"w+")))
+		if (!(d->tmp = fopen(d->filename,"w+")))
 			goto out;
 	}
 
@@ -490,9 +501,16 @@ out:
 static int data_sort(data_t *d, int cols, int *to_sort_cols)
 {
 	int err = -1;
-	FILE *sorted_outf;
+	char *sorted_name = NULL;
+	FILE *sorted_outf = NULL;
 
-	if (!(sorted_outf = fopen("sorted-out","wb")))
+	if (!(sorted_name = malloc(strlen(d->filename) + 10)))
+		goto out;
+
+	strcpy(sorted_name,d->filename);
+	strcat(sorted_name,"-sorted");
+
+	if (!(sorted_outf = fopen(sorted_name,"wb")))
 		goto out;
 
 	data_sort_callback(d, cols, to_sort_cols, data_sort_cb, sorted_outf);
@@ -502,10 +520,10 @@ static int data_sort(data_t *d, int cols, int *to_sort_cols)
 		fclose(d->tmp);
 		d->tmp = NULL;
 	}
-	remove(OUTFILE);
-	rename("sorted-out",OUTFILE);
+	remove(d->filename);
+	rename(sorted_name,d->filename);
 
-	if (!(d->tmp = fopen(OUTFILE,"a+")))
+	if (!(d->tmp = fopen(d->filename,"a+")))
 	{
 		fprintf(stderr,"Couldn't open file for appending\n");
 		goto out;
@@ -515,6 +533,7 @@ static int data_sort(data_t *d, int cols, int *to_sort_cols)
 	err = 0;
 out:
 	if (sorted_outf) fclose(sorted_outf);
+	if (sorted_name) free(sorted_name);
 	return err;
 }
 
@@ -535,4 +554,3 @@ out:
 	va_end(vl);
 	return err;
 }
-
