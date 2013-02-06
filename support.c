@@ -564,11 +564,48 @@ out:
 
 static int data_stat(data_t *d, int label_col, int cols, int *to_sort_cols)
 {
+	int r;
 	int err = -1;
+
+	int32_t *tps = NULL;
+
 	if ((err = data_sort(d,cols,to_sort_cols)))
 		goto out;
+
+	if (!(tps = malloc(sizeof(tps[0])*d->num_rows)))
+		goto out;
+
+	if ((err = data_get_entry_as_int32(&tps[0],d,0,label_col)))
+		goto out;
+
+	for (r=1; r < d->num_rows; r++)
+	{
+		int32_t l;
+
+		if ((err = data_get_entry_as_int32(&l,d,r,label_col)))
+			goto out;
+		fprintf(stderr,"%d\n",l);
+		tps[r] = tps[r - 1] + (l > 0);
+	}
 	err = 0;
+
+	int positives = tps[d->num_rows - 1];
+	int negatives = d->num_rows - positives;
+
+	for (r=0; r < d->num_rows; r++)
+	{
+		int32_t fps = (r+1) - tps[r];
+
+		double tpr = (double)tps[r] / positives; /* true positive rate */
+		double fpr = (double)fps / negatives; /* false postive rate */
+		double prec = (double)tps[r]/(r+1); /* precision = true positives / (number of all positives = (true positives + false negatives) */
+		double recall = (double)tps[r]/tps[d->num_rows-1]; /* recall = number of true positives / (true positives + false negatives = all positive samples) */
+
+		fprintf(stderr,"%d tps=%d fps=%d tpr=%lf fpr=%lf prec=%lf recall=%lf\n",r,tps[r],fps,tpr,fpr,prec,recall);
+	}
 out:
+	fprintf(stderr,"Stats err=%d\n",err);
+	free(tps);
 	return err;
 }
 
