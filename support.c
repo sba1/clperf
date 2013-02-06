@@ -297,7 +297,7 @@ static int data_read_block_for_row(data_t *d, block_t *b, int row)
 	fprintf(stderr,"Reading from %x (offset %d)\n", ftell(d->tmp), row);
 	if (fread(b->block, d->num_bytes_per_row, b->num_rows, d->tmp) == 0)
 	{
-		fprintf(stderr,"Reading failed\n!");
+		fprintf(stderr,"Reading row %d failed!\n",row);
 		goto out;
 	}
 	b->row_offset = row;
@@ -424,7 +424,7 @@ out:
  * @param to_sort_cols
  * @return
  */
-static int data_sort(data_t *d, int cols, int *to_sort_cols)
+static int data_sort_callback(data_t *d, int cols, int *to_sort_cols, int (*callback)(data_t *d, uint8_t *row, void *user_data), void *user_data)
 {
 	int i;
 	int k;
@@ -481,7 +481,6 @@ static int data_sort(data_t *d, int cols, int *to_sort_cols)
 			}
 		}
 
-		FILE *sorted_outf = fopen("sorted-out","wb");
 		int m;
 
 		/* Merge */
@@ -516,30 +515,59 @@ static int data_sort(data_t *d, int cols, int *to_sort_cols)
 			}
 
 			block_t *bsk = &in_blocks[sk];
-			printf("m=%d sk=%d %d %d\n",m,sk,ftell(sorted_outf),bsk->current_relative_row);
-			fwrite(&bsk->block[bsk->current_relative_row * d->num_bytes_per_row],d->num_bytes_per_row,1,sorted_outf);
+			callback(d, &bsk->block[bsk->current_relative_row * d->num_bytes_per_row], user_data);
 			data_advance_head(d,bsk);
 		}
 
-		fclose(sorted_outf);
 		free(in_blocks);
-
-		if (d->tmp)
-		{
-			fclose(d->tmp);
-			d->tmp = NULL;
-		}
-
-		remove(OUTFILE);
-		rename("sorted-out",OUTFILE);
-
-		if (!(d->tmp = fopen(OUTFILE,"a+")))
-			goto out;
-
-		data_read_block_for_row(d, &d->ib, 0);
 	}
 	err = 0;
 out:
+	return err;
+}
+
+static int data_sort_cb(data_t *d, uint8_t *buf, void *user_data)
+{
+	int err;
+	FILE *sorted_outf;
+
+	err = -1;
+
+	sorted_outf = (FILE*)user_data;
+	fwrite(buf,d->num_bytes_per_row,1,sorted_outf);
+	err = 0;
+out:
+	return err;
+}
+
+static int data_sort(data_t *d, int cols, int *to_sort_cols)
+{
+	int err = -1;
+	FILE *sorted_outf;
+
+	if (!(sorted_outf = fopen("sorted-out","wb")))
+		goto out;
+
+	data_sort_callback(d, cols, to_sort_cols, data_sort_cb, sorted_outf);
+
+	if (d->tmp)
+	{
+		fclose(d->tmp);
+		d->tmp = NULL;
+	}
+	remove(OUTFILE);
+	rename("sorted-out",OUTFILE);
+
+	if (!(d->tmp = fopen(OUTFILE,"a+")))
+	{
+		fprintf(stderr,"Couldn't open file for appending\n");
+		goto out;
+	}
+	data_read_block_for_row(d, &d->ib, 0);
+
+	err = 0;
+out:
+	if (sorted_outf) fclose(sorted_outf);
 	return err;
 }
 
