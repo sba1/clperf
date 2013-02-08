@@ -4,7 +4,7 @@ OBJS = $(patsubst %.c,%.o,$(SRCS))
 TEST_SRCS = $(wildcard tests/*.c)
 TEST_EXES = $(patsubst %.c,%,$(TEST_SRCS))
 
-CFLAGS = -ggdb -I.
+CFLAGS = -Wall -ggdb -I.
 VALGRIND = valgrind --track-origins=yes --leak-check=full --show-reachable=yes
 
 tests/%: tests/%.c $(SRCS)

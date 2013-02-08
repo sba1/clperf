@@ -248,6 +248,7 @@ out:
 int data_set_column_datatype(data_t *d, int col, enum column_datatype_t dt)
 {
 	d->column_datatype[col] = dt;
+	return 0;
 }
 
 /**
@@ -285,7 +286,6 @@ static size_t data_sizeof_row_and_set_column_offsets(data_t *d)
  */
 static int data_initialize_block(block_t *b, data_t *d, uint32_t block_bytes)
 {
-	int col;
 	int err = -1;
 	if (!(b->block = (uint8_t*)malloc(block_bytes)))
 		goto out;
@@ -324,7 +324,7 @@ static int data_write_input_block(data_t *d)
 		fprintf(stderr,"Seek failed\n");
 		goto out;
 	}
-	fprintf(stderr,"Writing to %x (offset %d)\n",ftell(d->tmp),b->row_offset);
+	fprintf(stderr,"Writing to %x (offset %d)\n",(unsigned int)ftell(d->tmp),b->row_offset);
 	if ((fwrite(b->block,d->num_bytes_per_row,b->num_rows,d->tmp) != b->num_rows ))
 	{
 		fprintf(stderr,"Write failed!\n");
@@ -504,7 +504,6 @@ int data_load_from_ascii(data_t *d, const char *filename)
 		first_data_line = 0;
 
 	/* Determine columns */
-	int col = 0;
 	int ln;
 
 	if (!(column_types = (enum column_datatype_t*)calloc(ncols,sizeof(column_types[0]))))
@@ -545,12 +544,14 @@ int data_load_from_ascii(data_t *d, const char *filename)
 	if (!(row = (uint8_t*)malloc(data_sizeof_row_and_set_column_offsets(d))))
 		goto out;
 
-	linenr = first_data_line + 1;
+	linenr = first_data_line;
 
 	while (!(err = fio_read_next_line(&line,&fio)))
 	{
 		int pos = 0;
 		int row_pos = 0;
+
+		linenr++;
 
 		for (i=0;i<ncols;i++)
 		{
@@ -580,7 +581,7 @@ int data_load_from_ascii(data_t *d, const char *filename)
 							break;
 						}
 				default:
-						fprintf(stderr,"Unknown column type\n");
+						fprintf(stderr,"Unknown column type at line %d in column %d\n",linenr,i);
 						goto out;
 
 			}
@@ -636,7 +637,7 @@ static int data_read_block_for_row(data_t *d, block_t *b, int row)
 	int err = -1;
 
 	fseek(d->tmp, row * d->num_bytes_per_row, SEEK_SET);
-	fprintf(stderr,"Reading from %x (offset %d)\n", ftell(d->tmp), row);
+	fprintf(stderr,"Reading from %x (offset %d)\n", (unsigned int)ftell(d->tmp), row);
 	if (fread(b->block, d->num_bytes_per_row, b->num_rows, d->tmp) == 0)
 	{
 		fprintf(stderr,"Reading row %d failed!\n",row);
@@ -769,7 +770,6 @@ static int data_advance_head(data_t *d, block_t *b)
 	b->current_row++;
 
 	err = 0;
-out:
 	return err;
 }
 
@@ -893,7 +893,11 @@ static int data_sort_cb(data_t *d, uint8_t *buf, void *user_data)
 	err = -1;
 
 	sorted_outf = (FILE*)user_data;
-	fwrite(buf,d->num_bytes_per_row,1,sorted_outf);
+	if (!fwrite(buf,d->num_bytes_per_row,1,sorted_outf))
+	{
+		fprintf(stderr,"Failed to write some data\n!");
+		goto out;
+	}
 	err = 0;
 out:
 	return err;
@@ -943,7 +947,7 @@ out:
 	return err;
 }
 
-static int data_sort_v(data_t *d, int cols, ...)
+int data_sort_v(data_t *d, int cols, ...)
 {
 	int i;
 	int err = -1;
@@ -956,7 +960,7 @@ static int data_sort_v(data_t *d, int cols, ...)
 		to_sort_cols[i] = va_arg(vl,int);
 
 	data_sort(d,cols,to_sort_cols);
-out:
+
 	va_end(vl);
 	return err;
 }
@@ -1021,7 +1025,7 @@ int data_stat_v(data_t *d, int label_col, int cols, ...)
 		to_sort_cols[i] = va_arg(vl,int);
 
 	err = data_stat(d, label_col, cols, to_sort_cols);
-out:
+
 	va_end(vl);
 	return err;
 }

@@ -1,3 +1,5 @@
+#define _GNU_SOURCE
+
 #include <stdlib.h>
 #include <stdio.h>
 
@@ -50,7 +52,6 @@ static char *helper_assert_data(data_t *d)
 static char *helper_insert_and_assert_data(data_t *d)
 {
 	char *rc;
-	int i;
 
 	mu_assert(!data_set_number_of_columns(d,6));
 	mu_assert(d->num_columns == 6);
@@ -178,6 +179,8 @@ static char *test_fio(void)
 	mu_assert(!strcmp("0	0.51	0.42	8	0	0\n",l));
 
 	fio_deinit(&fio);
+
+	return NULL;
 }
 
 /************************************************************/
