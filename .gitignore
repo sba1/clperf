@@ -1,4 +1,8 @@
 .project
 .cproject
 .settings
+*.o
 out
+out-sorted
+clperf
+

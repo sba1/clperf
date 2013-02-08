@@ -8,6 +8,8 @@
  * @author Sebastian Bauer <mail@sebastianbauer.info>
  */
 
+#include <stdlib.h>
+
 int main(int argc, char **argv)
 {
 	int rc;
