@@ -150,6 +150,12 @@ struct data
 	block_t ib;
 };
 
+/**
+ * Constructs an empty data frame.
+ *
+ * @param out where the reference is stored.
+ * @return 0 on success, else an error.
+ */
 int data_create(data_t **out)
 {
 	int err = -1;
@@ -167,6 +173,12 @@ out:
 	return err;
 }
 
+/**
+ * Frees all memory associated with the given
+ * data frame.
+ *
+ * @param d
+ */
 void data_free(data_t *d)
 {
 	if (d)
@@ -192,6 +204,13 @@ void data_set_external_filename(data_t *d, const char *filename)
 	d->filename = filename;
 }
 
+/**
+ * Sets the number of columns of the given data frame.
+ *
+ * @param d
+ * @param cols
+ * @return 0 on success, else an error.
+ */
 int data_set_number_of_columns(data_t *d, uint32_t cols)
 {
 	int i;
@@ -216,12 +235,27 @@ out:
 	return err;
 }
 
+/**
+ * Sets the type of the column.
+ *
+ * @param d
+ * @param col
+ * @param dt
+ * @return
+ */
 int data_set_column_datatype(data_t *d, int col, enum column_datatype_t dt)
 {
 	d->column_datatype[col] = dt;
 }
 
-static size_t data_sizeof_columns_and_set_column_offsets(data_t *d)
+/**
+ * Calculates the memory occupied by one row and determines the
+ * column offsets.
+ *
+ * @param d
+ * @return the number of bytes occupied by one row.
+ */
+static size_t data_sizeof_row_and_set_column_offsets(data_t *d)
 {
 	int col;
 	size_t size = 0;
@@ -239,6 +273,14 @@ static size_t data_sizeof_columns_and_set_column_offsets(data_t *d)
 	return size;
 }
 
+/**
+ * Initializes a given block.
+ *
+ * @param b
+ * @param d
+ * @param block_bytes
+ * @return 0 on success, else an error.
+ */
 static int data_initialize_block(block_t *b, data_t *d, uint32_t block_bytes)
 {
 	int col;
@@ -256,6 +298,12 @@ out:
 	return err;
 }
 
+/**
+ * Write the contents of the input block to disk.
+ *
+ * @param d
+ * @return 0 on success, else an error.
+ */
 static int data_write_input_block(data_t *d)
 {
 	int err;
@@ -287,11 +335,13 @@ out:
 
 
 /**
- * Prepare the data for next row.
+ * Prepare the data for next row and determine buffers
+ * where it can be stored.
  *
- * @param out
+ * @param out the pointer to a location in which the values of the next
+ *  row can be stored.
  * @param d
- * @return
+ * @return 0 on success, else an error.
  */
 int data_insert_row_prolog(uint8_t **out, data_t* d)
 {
@@ -299,7 +349,7 @@ int data_insert_row_prolog(uint8_t **out, data_t* d)
 
 	if (!d->ib.block)
 	{
-		d->num_bytes_per_row = data_sizeof_columns_and_set_column_offsets(d);
+		d->num_bytes_per_row = data_sizeof_row_and_set_column_offsets(d);
 		if ((err = data_initialize_block(&d->ib, d, d->ib_bytes)))
 			goto out;
 	}
@@ -316,6 +366,13 @@ out:
 	return err;
 }
 
+/**
+ * Insert a single row.
+ *
+ * @param d
+ * @param row
+ * @return 0 on success, else an error.
+ */
 int data_insert_row(data_t *d, uint8_t *row)
 {
 	int err = -1;
@@ -334,6 +391,12 @@ out:
 	return err;
 }
 
+/**
+ * Insert a single row using a list of variable arguments.
+ *
+ * @param d the data frame in which to insert the row.
+ * @return 0 on success, else an error.
+ */
 int data_insert_row_v(data_t *d, ...)
 {
 	int err = -1;
@@ -381,10 +444,10 @@ out:
 /**
  * Read the block starting at row in the block.
  *
- * @param d
- * @param b
- * @param row
- * @return
+ * @param d the data frame associated with the block
+ * @param b the block where to store the result of the read operation.
+ * @param row the index of the row.
+ * @return 0 on success, else an error.
  */
 static int data_read_block_for_row(data_t *d, block_t *b, int row)
 {
@@ -404,6 +467,13 @@ out:
 
 }
 
+/**
+ * Read the contents of the given row to the input block.
+ *
+ * @param d the associated data frame.
+ * @param row
+ * @return 0 on success, else an error.
+ */
 static int data_read_input_block_for_row(data_t *d, int row)
 {
 	int err = -1;
@@ -421,6 +491,16 @@ out:
 	return err;
 }
 
+/**
+ * Determine the pointer to the given column/row. May read the associated
+ * block if the element is currently not in the input block.
+ *
+ * @param out where to store the pointer.
+ * @param d the associatated data frame.
+ * @param i the row
+ * @param j the column
+ * @return 0 on success, else an error.
+ */
 static int data_get_buf_ptr(uint8_t **out, data_t *d, int i, int j)
 {
 	int err = -1;
@@ -855,7 +935,7 @@ int data_load_from_ascii(data_t *d, const char *filename)
 	for (i=0;i<ncols;i++)
 		data_set_column_datatype(d,i,column_types[i]);
 
-	if (!(row = (uint8_t*)malloc(data_sizeof_columns_and_set_column_offsets(d))))
+	if (!(row = (uint8_t*)malloc(data_sizeof_row_and_set_column_offsets(d))))
 		goto out;
 
 	linenr = first_data_line + 1;

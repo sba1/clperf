@@ -60,7 +60,7 @@ static char *helper_insert_and_assert_data(data_t *d)
 	data_set_column_datatype(d,3,INT32);
 	data_set_column_datatype(d,4,INT32);
 	data_set_column_datatype(d,5,INT32);
-	mu_assert(data_sizeof_columns_and_set_column_offsets(d)==32);
+	mu_assert(data_sizeof_row_and_set_column_offsets(d)==32);
 	mu_assert(d->column_offsets[0] == 0);
 	mu_assert(d->column_offsets[1] == 4);
 	mu_assert(d->column_offsets[2] == 12);
