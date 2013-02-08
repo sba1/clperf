@@ -15,6 +15,7 @@
 #include "support.h"
 
 #define MIN(a,b) ((a)<(b)?(a):(b))
+#define MAX(a,b) ((a)>(b)?(a):(b))
 
 /**************************************************************/
 
@@ -836,7 +837,7 @@ static int data_sort_callback(data_t *d, int cols, int *to_sort_cols, int (*call
 		/* Init in buffers */
 		for (i=0;i<k;i++)
 		{
-			if ((err = data_initialize_block(&in_blocks[i],d,32)))
+			if ((err = data_initialize_block(&in_blocks[i],d,MIN(rows_per_in_block*d->num_bytes_per_row,65536))))
 			{
 				fprintf(stderr,"Couldn't alloc block for input\n");
 				goto out;
