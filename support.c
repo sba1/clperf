@@ -154,6 +154,9 @@ struct data
 
 	int *to_sort_columns;
 	int num_to_sort_columns;
+
+	int label_col;
+	int64_t label_sum;
 };
 
 /**
@@ -799,6 +802,9 @@ static int data_sort_callback(data_t *d, int cols, int *to_sort_cols, int (*call
 
 	int err = -1;
 
+	int label_col_offset = d->column_offsets[d->label_col];
+	int64_t label_sum = 0;
+
 	/* In place sort using the input block buffer */
 	for (i=0;i<d->num_rows;)
 	{
@@ -854,7 +860,7 @@ static int data_sort_callback(data_t *d, int cols, int *to_sort_cols, int (*call
 		/* Merge */
 		for (m=0;m<d->num_rows;m++)
 		{
-			int sk;
+			int sk; /* k with smallest entry */
 
 			for (sk=0;sk<k;sk++)
 				if (in_blocks[sk].current_row < rows_per_in_block)
@@ -883,7 +889,9 @@ static int data_sort_callback(data_t *d, int cols, int *to_sort_cols, int (*call
 			}
 
 			block_t *bsk = &in_blocks[sk];
-			callback(d, &bsk->block[bsk->current_relative_row * d->num_bytes_per_row], user_data);
+			uint8_t *bskb = &bsk->block[bsk->current_relative_row * d->num_bytes_per_row];
+			label_sum += *(int32_t*)(&bskb[label_col_offset]);
+			callback(d, bskb, user_data);
 			data_advance_head(d,bsk);
 		}
 
@@ -891,6 +899,7 @@ static int data_sort_callback(data_t *d, int cols, int *to_sort_cols, int (*call
 			free(in_blocks[i].block);
 		free(in_blocks);
 	}
+	d->label_sum = label_sum;
 	err = 0;
 out:
 	return err;
@@ -987,45 +996,36 @@ int data_stat(data_t *d, int label_col, int cols, int *to_sort_cols)
 {
 	int r;
 	int err = -1;
+	uint32_t tps = 0;
 
-	int32_t *tps = NULL;
+	d->label_col = label_col;
 
 	if ((err = data_sort(d,cols,to_sort_cols)))
 		goto out;
 
-	if (!(tps = malloc(sizeof(tps[0])*d->num_rows)))
-		goto out;
+	int positives = d->label_sum;
+	int negatives = d->num_rows - positives;
 
-	if ((err = data_get_entry_as_int32(&tps[0],d,0,label_col)))
-		goto out;
-
-	for (r=1; r < d->num_rows; r++)
+	for (r=0; r < d->num_rows; r++)
 	{
 		int32_t l;
 
 		if ((err = data_get_entry_as_int32(&l,d,r,label_col)))
 			goto out;
-		tps[r] = tps[r - 1] + (l > 0);
+
+		tps += l > 0;
+		int32_t fps = (r+1) - tps;
+
+		double tpr = (double)tps / positives; /* true positive rate */
+		double fpr = (double)fps / negatives; /* false postive rate */
+		double prec = (double)tps / (r+1); /* precision = true positives / (number of all positives = (true positives + false negatives) */
+		double recall = (double)tps / positives; /* recall = number of true positives / (true positives + false negatives = all positive samples) */
+
+		fprintf(stderr,"%d tps=%d fps=%d tpr=%lf fpr=%lf prec=%lf recall=%lf\n",r,tps,fps,tpr,fpr,prec,recall);
 	}
 	err = 0;
-
-	int positives = tps[d->num_rows - 1];
-	int negatives = d->num_rows - positives;
-
-	for (r=0; r < d->num_rows; r++)
-	{
-		int32_t fps = (r+1) - tps[r];
-
-		double tpr = (double)tps[r] / positives; /* true positive rate */
-		double fpr = (double)fps / negatives; /* false postive rate */
-		double prec = (double)tps[r]/(r+1); /* precision = true positives / (number of all positives = (true positives + false negatives) */
-		double recall = (double)tps[r]/tps[d->num_rows-1]; /* recall = number of true positives / (true positives + false negatives = all positive samples) */
-
-		fprintf(stderr,"%d tps=%d fps=%d tpr=%lf fpr=%lf prec=%lf recall=%lf\n",r,tps[r],fps,tpr,fpr,prec,recall);
-	}
 out:
 	fprintf(stderr,"Stats err=%d\n",err);
-	free(tps);
 	return err;
 }
 
