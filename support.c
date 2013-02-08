@@ -609,7 +609,7 @@ out:
  */
 uint32_t data_get_number_of_columns(data_t *d)
 {
-	return d->num_rows;
+	return d->num_columns;
 }
 
 /**
@@ -620,7 +620,7 @@ uint32_t data_get_number_of_columns(data_t *d)
  */
 uint32_t data_get_number_of_rows(data_t *d)
 {
-	return d->num_columns;
+	return d->num_rows;
 }
 
 
