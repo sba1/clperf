@@ -16,6 +16,102 @@
 
 /**************************************************************/
 
+#define FIO_FIRST_LINES 8
+
+struct fio
+{
+	FILE *file;
+	int file_was_opened;
+	int current_line_nr;
+	char *current_line;
+	char *first_lines[FIO_FIRST_LINES];
+};
+
+int fio_init_by_file(struct fio *f, const char *filename)
+{
+	int err;
+	int i;
+	FILE *file;
+
+	err = -1;
+
+	if (!(file = fopen(filename,"r")))
+		goto out;
+
+	memset(f,0,sizeof(*f));
+	f->file = file;
+	f->file_was_opened = 1;
+
+	for (i=0;i<FIO_FIRST_LINES;i++)
+	{
+		size_t len = 0;
+
+		if (getline(&f->first_lines[i],&len,f->file) < 0)
+			break;
+	}
+	err = 0;
+out:
+	return err;
+}
+
+/**
+ * Reads a single line.
+ *
+ * @param line
+ * @param f
+ * @return
+ */
+int fio_read_next_line(const char **line, struct fio *f)
+{
+	char *l;
+	int err;
+
+	err = -1;
+
+	if (f->current_line)
+	{
+		free(f->current_line);
+		f->current_line = NULL;
+	}
+
+	if (f->current_line_nr < FIO_FIRST_LINES)
+	{
+		if (!(l = f->first_lines[f->current_line_nr]))
+			goto out;
+		f->current_line_nr++;
+	} else
+	{
+		size_t len = 0;
+		l = NULL;
+
+		if (getline(&l,&len,f->file) < 0)
+		{
+			if (l) free(l);
+			goto out;
+		}
+	}
+
+	if (!l)
+		goto out;
+
+	*line = l;
+	f->current_line = l;
+	err = 0;
+out:
+	return err;
+}
+
+void fio_deinit(struct fio *f)
+{
+	if (f->current_line) free(f->current_line);
+	if (f->file_was_opened)
+	{
+		fclose(f->file);
+	}
+}
+
+/**************************************************************/
+
 typedef struct
 {
 	/** Memory allocated for the block */
@@ -666,102 +762,6 @@ static int data_stat_v(data_t *d, int label_col, int cols, ...)
 out:
 	va_end(vl);
 	return err;
-}
-
-/***************************************************/
-
-#define FIO_FIRST_LINES 8
-
-struct fio
-{
-	FILE *file;
-	int file_was_opened;
-	int current_line_nr;
-	char *current_line;
-	char *first_lines[FIO_FIRST_LINES];
-};
-
-int fio_init_by_file(struct fio *f, const char *filename)
-{
-	int err;
-	int i;
-	FILE *file;
-
-	err = -1;
-
-	if (!(file = fopen(filename,"r")))
-		goto out;
-
-	memset(f,0,sizeof(*f));
-	f->file = file;
-	f->file_was_opened = 1;
-
-	for (i=0;i<FIO_FIRST_LINES;i++)
-	{
-		size_t len = 0;
-
-		if (getline(&f->first_lines[i],&len,f->file) < 0)
-			break;
-	}
-	err = 0;
-out:
-	return err;
-}
-
-/**
- * Reads a single line.
- *
- * @param line
- * @param f
- * @return
- */
-int fio_read_next_line(const char **line, struct fio *f)
-{
-	char *l;
-	int err;
-
-	err = -1;
-
-	if (f->current_line)
-	{
-		free(f->current_line);
-		f->current_line = NULL;
-	}
-
-	if (f->current_line_nr < FIO_FIRST_LINES)
-	{
-		if (!(l = f->first_lines[f->current_line_nr]))
-			goto out;
-		f->current_line_nr++;
-	} else
-	{
-		size_t len = 0;
-		l = NULL;
-
-		if (getline(&l,&len,f->file) < 0)
-		{
-			if (l) free(l);
-			goto out;
-		}
-	}
-
-	if (!l)
-		goto out;
-
-	*line = l;
-	f->current_line = l;
-	err = 0;
-out:
-	return err;
-}
-
-void fio_deinit(struct fio *f)
-{
-	if (f->current_line) free(f->current_line);
-	if (f->file_was_opened)
-	{
-		fclose(f->file);
-	}
 }
 
 int data_load_from_ascii(data_t *d, const char *filename)
