@@ -442,6 +442,163 @@ out:
 }
 
 /**
+ * Loads from the given file a data frame in to an already
+ * created (vanilla) data frame.
+ *
+ * @param d the result as returned by data_create().
+ * @param filename the file from which to read
+ * @return 0 on success, else an error.
+ */
+int data_load_from_ascii(data_t *d, const char *filename)
+{
+	int i;
+	int err = -1;
+	struct fio fio;
+	int pro_header = 0;
+	int con_header = 0;
+	int ncols = 1;
+	enum column_datatype_t *column_types = NULL;
+	uint8_t *row = NULL;
+
+	size_t len ;
+	const char *line;
+	int linenr = 1; /* 1-based */
+	int first_data_line = 0;
+
+	if ((err = fio_init_by_file(&fio,filename)))
+	{
+		fprintf(stderr,"Couldn't open \"%s\"\n",filename);
+		goto out;
+	}
+
+	line = fio.first_lines[0];
+	len = strlen(line);
+
+	/* Guess, if this is a header, also determine number of columns */
+	for (i=0;i<len;i++)
+	{
+		if (line[i] == '\t')
+			ncols++;
+		else
+		{
+			if (line[i] == '-' || line[i] == 'e' || line[i] == 'E' || line[i] == '.' || isdigit((int)line[i]))
+			{
+				pro_header++;
+				con_header++;
+			} else
+			{
+				pro_header++;
+			}
+		}
+	}
+
+	if (pro_header > con_header)
+	{
+		first_data_line = 1;
+		if ((err = fio_read_next_line(&line,&fio)))
+			goto out;
+	}
+	else
+		first_data_line = 0;
+
+	/* Determine columns */
+	int col = 0;
+	int ln;
+
+	if (!(column_types = (enum column_datatype_t*)calloc(ncols,sizeof(column_types[0]))))
+		goto out;
+
+	for (ln = first_data_line; ln < FIO_FIRST_LINES && ((line = fio.first_lines[ln])); ln++)
+	{
+		int is_double = 0;
+		int col = 0;
+		len = strlen(line);
+
+		for (i=0;i<len;i++)
+		{
+			if (line[i] == '\t' || line[i] == '\n')
+			{
+				enum column_datatype_t newt = INT32;
+				if (is_double) newt = DOUBLE;
+
+				if (column_types[col] == UNKNOWN || newt == DOUBLE)
+					column_types[col] = newt;
+
+				col++;
+				is_double = 0;
+			} else
+			{
+				if (line[i] == '-' || line[i] == 'e' || line[i] == 'E' || line[i] == '.')
+					is_double = 1;
+			}
+		}
+	}
+
+	if ((err = data_set_number_of_columns(d,ncols)))
+		goto out;
+
+	for (i=0;i<ncols;i++)
+		data_set_column_datatype(d,i,column_types[i]);
+
+	if (!(row = (uint8_t*)malloc(data_sizeof_row_and_set_column_offsets(d))))
+		goto out;
+
+	linenr = first_data_line + 1;
+
+	while (!(err = fio_read_next_line(&line,&fio)))
+	{
+		int pos = 0;
+		int row_pos = 0;
+
+		for (i=0;i<ncols;i++)
+		{
+			enum column_datatype_t ct = column_types[i];
+
+			switch (ct)
+			{
+				case	INT32:
+						{
+							long v;
+							char *end;
+							v = strtol(&line[pos],&end,10);
+							*((int32_t*)&row[row_pos]) = v;
+							row_pos += sizeof(int32_t);
+							pos = end - line;
+							break;
+						}
+
+				case	DOUBLE:
+						{
+							double v;
+							char *end;
+							v = strtod(&line[pos],&end);
+							*((double*)&row[row_pos]) = v;
+							row_pos += sizeof(double);
+							pos = end - line;
+							break;
+						}
+				default:
+						fprintf(stderr,"Unknown column type\n");
+						goto out;
+
+			}
+
+			while (line[pos] && line[pos] != '\t')
+				pos++;
+		}
+		if ((err = data_insert_row(d,row)))
+			goto out;
+	}
+
+	err = 0;
+out:
+	free(column_types);
+	free(row);
+	fio_deinit(&fio);
+	return err;
+}
+
+/**
  * Read the block starting at row in the block.
  *
  * @param d the data frame associated with the block
@@ -841,154 +998,5 @@ static int data_stat_v(data_t *d, int label_col, int cols, ...)
 	err = data_stat(d, label_col, cols, to_sort_cols);
 out:
 	va_end(vl);
-	return err;
-}
-
-int data_load_from_ascii(data_t *d, const char *filename)
-{
-	int i;
-	int err = -1;
-	struct fio fio;
-	int pro_header = 0;
-	int con_header = 0;
-	int ncols = 1;
-	enum column_datatype_t *column_types = NULL;
-	uint8_t *row = NULL;
-
-	size_t len ;
-	const char *line;
-	int linenr = 1; /* 1-based */
-	int first_data_line = 0;
-
-	if ((err = fio_init_by_file(&fio,filename)))
-	{
-		fprintf(stderr,"Couldn't open \"%s\"\n",filename);
-		goto out;
-	}
-
-	line = fio.first_lines[0];
-	len = strlen(line);
-
-	/* Guess, if this is a header, also determine number of columns */
-	for (i=0;i<len;i++)
-	{
-		if (line[i] == '\t')
-			ncols++;
-		else
-		{
-			if (line[i] == '-' || line[i] == 'e' || line[i] == 'E' || line[i] == '.' || isdigit((int)line[i]))
-			{
-				pro_header++;
-				con_header++;
-			} else
-			{
-				pro_header++;
-			}
-		}
-	}
-
-	if (pro_header > con_header)
-	{
-		first_data_line = 1;
-		if ((err = fio_read_next_line(&line,&fio)))
-			goto out;
-	}
-	else
-		first_data_line = 0;
-
-	/* Determine columns */
-	int col = 0;
-	int ln;
-
-	if (!(column_types = (enum column_datatype_t*)calloc(ncols,sizeof(column_types[0]))))
-		goto out;
-
-	for (ln = first_data_line; ln < FIO_FIRST_LINES && ((line = fio.first_lines[ln])); ln++)
-	{
-		int is_double = 0;
-		int col = 0;
-		len = strlen(line);
-
-		for (i=0;i<len;i++)
-		{
-			if (line[i] == '\t' || line[i] == '\n')
-			{
-				enum column_datatype_t newt = INT32;
-				if (is_double) newt = DOUBLE;
-
-				if (column_types[col] == UNKNOWN || newt == DOUBLE)
-					column_types[col] = newt;
-
-				col++;
-				is_double = 0;
-			} else
-			{
-				if (line[i] == '-' || line[i] == 'e' || line[i] == 'E' || line[i] == '.')
-					is_double = 1;
-			}
-		}
-	}
-
-	if ((err = data_set_number_of_columns(d,ncols)))
-		goto out;
-
-	for (i=0;i<ncols;i++)
-		data_set_column_datatype(d,i,column_types[i]);
-
-	if (!(row = (uint8_t*)malloc(data_sizeof_row_and_set_column_offsets(d))))
-		goto out;
-
-	linenr = first_data_line + 1;
-
-	while (!(err = fio_read_next_line(&line,&fio)))
-	{
-		int pos = 0;
-		int row_pos = 0;
-
-		for (i=0;i<ncols;i++)
-		{
-			enum column_datatype_t ct = column_types[i];
-
-			switch (ct)
-			{
-				case	INT32:
-						{
-							long v;
-							char *end;
-							v = strtol(&line[pos],&end,10);
-							*((int32_t*)&row[row_pos]) = v;
-							row_pos += sizeof(int32_t);
-							pos = end - line;
-							break;
-						}
-
-				case	DOUBLE:
-						{
-							double v;
-							char *end;
-							v = strtod(&line[pos],&end);
-							*((double*)&row[row_pos]) = v;
-							row_pos += sizeof(double);
-							pos = end - line;
-							break;
-						}
-				default:
-						fprintf(stderr,"Unknown column type\n");
-						goto out;
-
-			}
-
-			while (line[pos] && line[pos] != '\t')
-				pos++;
-		}
-		if ((err = data_insert_row(d,row)))
-			goto out;
-	}
-
-	err = 0;
-out:
-	free(column_types);
-	free(row);
-	fio_deinit(&fio);
 	return err;
 }
