@@ -959,7 +959,7 @@ int data_sort_v(data_t *d, int cols, ...)
 	for (i=0;i<cols;i++)
 		to_sort_cols[i] = va_arg(vl,int);
 
-	data_sort(d,cols,to_sort_cols);
+	err = data_sort(d,cols,to_sort_cols);
 
 	va_end(vl);
 	return err;
