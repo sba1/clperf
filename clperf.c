@@ -12,6 +12,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "support.h"
+
 /**
  * Displays usage.
  *
@@ -26,7 +28,11 @@ int main(int argc, char **argv)
 {
 	int rc;
 	int i;
+	int err = -1;
+	data_t *d = NULL;
+
 	const char *filename = NULL;
+	int verbose = 0;
 
 	const char *cmd;
 
@@ -43,6 +49,23 @@ int main(int argc, char **argv)
 			rc = EXIT_SUCCESS;
 			goto out;
 		}
+
+		if (!strcmp("--verbose",argv[i]))
+		{
+			verbose = 1;
+		} else if (argv[i][0] == '-')
+		{
+			fprintf(stderr,"%s: Unknown option \"%s\"",filename,argv[i]);
+			goto out;
+		} else
+		{
+			if (!filename) filename = argv[i];
+			else
+			{
+				fprintf(stderr,"%s: More than one filename arguments given!\n",cmd);
+				goto out;
+			}
+		}
 	}
 
 	if (!filename)
@@ -51,7 +74,23 @@ int main(int argc, char **argv)
 		goto out;
 	}
 
+	{
+		if ((err = data_create(&d)))
+			goto out;
+
+		if ((err = data_load_from_ascii(d,filename)))
+		{
+			fprintf(stderr,"Couldn't load \"%s\"\n",filename);
+			goto out;
+		}
+
+		if (verbose)
+		{
+//			fprintf(stderr,"Read data frame with %d lines and %d columns\n",);
+		}
+	}
 	rc = EXIT_SUCCESS;
 out:
+	if (d) data_free(d);
 	return rc;
 }

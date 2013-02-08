@@ -37,10 +37,10 @@ int fio_init_by_file(struct fio *f, const char *filename)
 
 	err = -1;
 
+	memset(f,0,sizeof(*f));
 	if (!(file = fopen(filename,"r")))
 		goto out;
 
-	memset(f,0,sizeof(*f));
 	f->file = file;
 	f->file_was_opened = 1;
 
@@ -601,6 +601,29 @@ out:
 }
 
 /**
+ * Returns the number of columns of the data frame.
+ *
+ * @param d the data frame in question
+ * @return the number of columns
+ */
+uint32_t data_get_number_of_columns(data_t *d)
+{
+	return d->num_rows;
+}
+
+/**
+ * Returns the number of rows of the data frame.
+ *
+ * @param d the data frame in question
+ * @return the number of rows
+ */
+uint32_t data_get_number_of_rows(data_t *d)
+{
+	return d->num_columns;
+}
+
+
+/**
  * Read the block starting at row in the block.
  *
  * @param d the data frame associated with the block
@@ -938,7 +961,7 @@ out:
 	return err;
 }
 
-static int data_stat(data_t *d, int label_col, int cols, int *to_sort_cols)
+int data_stat(data_t *d, int label_col, int cols, int *to_sort_cols)
 {
 	int r;
 	int err = -1;
@@ -985,7 +1008,7 @@ out:
 }
 
 
-static int data_stat_v(data_t *d, int label_col, int cols, ...)
+int data_stat_v(data_t *d, int label_col, int cols, ...)
 {
 	int i;
 	int err = -1;
