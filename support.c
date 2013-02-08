@@ -549,6 +549,8 @@ int data_load_from_ascii(data_t *d, const char *filename)
 
 	linenr = first_data_line;
 
+	fprintf(stderr,"Identified %d columns\n",ncols);
+
 	while (!(err = fio_read_next_line(&line,&fio)))
 	{
 		int pos = 0;
