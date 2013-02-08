@@ -150,6 +150,9 @@ struct data
 
 	/** Input block */
 	block_t ib;
+
+	int *to_sort_columns;
+	int num_to_sort_columns;
 };
 
 /**
@@ -723,17 +726,22 @@ int data_get_entry_as_int32(int32_t *out, data_t *d, int i, int j)
 
 static int data_sort_compare_cb(const void *a, const void *b, void *data)
 {
+	int c;
+	data_t *d = (data_t*)data;
 	const uint8_t *ra = (const uint8_t*)a;
 	const uint8_t *rb = (const uint8_t*)b;
 
-	ra += 4;
-	rb += 4;
+	for (c=0;c<d->num_to_sort_columns;c++)
+	{
+		int offset = d->column_offsets[d->to_sort_columns[c]];
 
-	double da = *(double*)ra;
-	double db = *(double*)rb;
+		double da = *(double*)(&ra[offset]);
+		double db = *(double*)(&rb[offset]);
 
-	if (da > db) return 1;
-	if (da < db) return -1;
+		if (da > db) return 1;
+		if (da < db) return -1;
+
+	}
 	return 0;
 }
 
@@ -903,7 +911,7 @@ out:
 	return err;
 }
 
-static int data_sort(data_t *d, int cols, int *to_sort_cols)
+static int data_sort(data_t *d, int num_to_sort_columns, int *to_sort_columns)
 {
 	int err = -1;
 	char *sorted_name = NULL;
@@ -918,7 +926,10 @@ static int data_sort(data_t *d, int cols, int *to_sort_cols)
 	if (!(sorted_outf = fopen(sorted_name,"wb")))
 		goto out;
 
-	if ((err = data_sort_callback(d, cols, to_sort_cols, data_sort_cb, sorted_outf)))
+	d->to_sort_columns = to_sort_columns;
+	d->num_to_sort_columns = num_to_sort_columns;
+
+	if ((err = data_sort_callback(d, num_to_sort_columns, to_sort_columns, data_sort_cb, sorted_outf)))
 		goto out;
 
 	if (d->tmp)
@@ -930,9 +941,13 @@ static int data_sort(data_t *d, int cols, int *to_sort_cols)
 		sorted_outf = NULL;
 
 		remove(d->filename);
-		rename(sorted_name,d->filename);
+		if (rename(sorted_name,d->filename) == -1)
+		{
+			fprintf(stderr,"Couldn't rename\n");
+			goto out;
+		}
 
-		if (!(d->tmp = fopen(d->filename,"a+")))
+		if (!(d->tmp = fopen(d->filename,"r+")))
 		{
 			fprintf(stderr,"Couldn't open file for appending\n");
 			goto out;
