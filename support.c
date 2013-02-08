@@ -170,7 +170,7 @@ int data_create(data_t **out)
 		goto out;
 	memset(n,0,sizeof(*n));
 
-	n->ib_bytes = 1024 * 1024;
+	n->ib_bytes = 1024 * 1024 * 10;
 	n->filename = "out";
 	*out = n;
 	err = 0;
