@@ -21,7 +21,7 @@
  */
 static void usage(const char *cmd)
 {
-	printf("%s INPUT\n",cmd);
+	printf("%s INPUT LABELCOL PREDCOL\n",cmd);
 }
 
 int main(int argc, char **argv)
@@ -30,8 +30,12 @@ int main(int argc, char **argv)
 	int i;
 	int err = -1;
 	data_t *d = NULL;
+	int nrows;
+	int ncols;
 
 	const char *filename = NULL;
+	int label_col = -1;
+	int pred_col = -1;
 	int verbose = 0;
 
 	const char *cmd;
@@ -60,9 +64,11 @@ int main(int argc, char **argv)
 		} else
 		{
 			if (!filename) filename = argv[i];
+			else if (label_col == -1) label_col = atoi((argv[i]));
+			else if (pred_col == -1) pred_col = atoi(argv[i]);
 			else
 			{
-				fprintf(stderr,"%s: More than one filename arguments given!\n",cmd);
+				fprintf(stderr,"%s: Too many arguments!\n",cmd);
 				goto out;
 			}
 		}
@@ -74,20 +80,49 @@ int main(int argc, char **argv)
 		goto out;
 	}
 
+	if (label_col == -1)
 	{
-		if ((err = data_create(&d)))
-			goto out;
+		fprintf(stderr,"%s: No label column specified\n",cmd);
+		goto out;
+	}
 
-		if ((err = data_load_from_ascii(d,filename)))
-		{
-			fprintf(stderr,"Couldn't load \"%s\"\n",filename);
-			goto out;
-		}
+	if (pred_col == -1)
+	{
+		fprintf(stderr,"%s: No prediction column specified\n",cmd);
+		goto out;
+	}
 
-		if (verbose)
-		{
-//			fprintf(stderr,"Read data frame with %d lines and %d columns\n",);
-		}
+	if ((err = data_create(&d)))
+		goto out;
+
+	if ((err = data_load_from_ascii(d,filename)))
+	{
+		fprintf(stderr,"Couldn't load \"%s\"\n",filename);
+		goto out;
+	}
+
+	nrows = data_get_number_of_rows(d);
+	ncols = data_get_number_of_columns(d);
+
+	if (verbose)
+		fprintf(stderr,"Read data frame with %d lines and %d columns\n",nrows,ncols);
+
+	if (label_col < 0 || label_col >= ncols)
+	{
+		fprintf(stderr,"Specified label column out of bounds.\n");
+		goto out;
+	}
+
+	if (pred_col < 0 || pred_col >= ncols)
+	{
+		fprintf(stderr,"Specified prediction column out of bounds.\n");
+		goto out;
+	}
+
+	if ((err = data_stat(d,label_col,1,&pred_col)))
+	{
+		fprintf(stderr,"Couldn't determine stat\n");
+		goto out;
 	}
 	rc = EXIT_SUCCESS;
 out:
