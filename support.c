@@ -813,8 +813,17 @@ static int data_sort_callback(data_t *d, int cols, int *to_sort_cols, int (*call
 		if ((err = data_read_input_block_for_row(d,i)))
 			goto out;
 		qsort_r(d->ib.block,rows_to_sort,d->num_bytes_per_row,data_sort_compare_cb,d);
+
+		for (k=0;k<rows_to_sort;k++)
+		{
+			uint8_t *buf = &d->ib.block[k * d->num_bytes_per_row];
+			label_sum += *(int32_t*)(&buf[label_col_offset]);
+
+		}
+
 		i += rows_to_sort;
 	}
+	d->label_sum = label_sum;
 
 	/* Now merge sort, we only support one pass for now */
 	k = (d->num_rows + d->ib.num_rows - 1 ) / d->ib.num_rows;
@@ -890,7 +899,6 @@ static int data_sort_callback(data_t *d, int cols, int *to_sort_cols, int (*call
 
 			block_t *bsk = &in_blocks[sk];
 			uint8_t *bskb = &bsk->block[bsk->current_relative_row * d->num_bytes_per_row];
-			label_sum += *(int32_t*)(&bskb[label_col_offset]);
 			callback(d, bskb, user_data);
 			data_advance_head(d,bsk);
 		}
@@ -899,7 +907,6 @@ static int data_sort_callback(data_t *d, int cols, int *to_sort_cols, int (*call
 			free(in_blocks[i].block);
 		free(in_blocks);
 	}
-	d->label_sum = label_sum;
 	err = 0;
 out:
 	return err;
@@ -992,7 +999,7 @@ int data_sort_v(data_t *d, int cols, ...)
 	return err;
 }
 
-int data_stat(data_t *d, int label_col, int cols, int *to_sort_cols)
+static int data_stat_callback(data_t *d, int (*callback)(uint32_t ps, uint32_t ns, uint32_t tps, uint32_t fps, void *userdata), void *user_data, int label_col, int cols, int *to_sort_cols)
 {
 	int r;
 	int err = -1;
@@ -1003,8 +1010,8 @@ int data_stat(data_t *d, int label_col, int cols, int *to_sort_cols)
 	if ((err = data_sort(d,cols,to_sort_cols)))
 		goto out;
 
-	int positives = d->label_sum;
-	int negatives = d->num_rows - positives;
+	uint32_t positives = d->label_sum;
+	uint32_t negatives = d->num_rows - positives;
 
 	for (r=0; r < d->num_rows; r++)
 	{
@@ -1014,21 +1021,33 @@ int data_stat(data_t *d, int label_col, int cols, int *to_sort_cols)
 			goto out;
 
 		tps += l > 0;
-		int32_t fps = (r+1) - tps;
+		uint32_t fps = (r+1) - tps;
 
-		double tpr = (double)tps / positives; /* true positive rate */
-		double fpr = (double)fps / negatives; /* false postive rate */
-		double prec = (double)tps / (r+1); /* precision = true positives / (number of all positives = (true positives + false negatives) */
-		double recall = (double)tps / positives; /* recall = number of true positives / (true positives + false negatives = all positive samples) */
-
-		fprintf(stderr,"%d tps=%d fps=%d tpr=%lf fpr=%lf prec=%lf recall=%lf\n",r,tps,fps,tpr,fpr,prec,recall);
+		callback(positives,negatives,tps,fps,user_data);
 	}
 	err = 0;
 out:
-	fprintf(stderr,"Stats err=%d\n",err);
+	if (err) fprintf(stderr,"Stats err=%d\n",err);
 	return err;
 }
 
+static int data_roc_precall_callback(uint32_t ps, uint32_t ns, uint32_t tps, uint32_t fps, void *userdata)
+{
+	double tpr = (double)tps / ps; /* true positive rate */
+	double fpr = (double)fps / ns; /* false positive rate */
+	double prec = (double)tps / (tps + fps); /* precision = true positives / (number of all positives = (true positives + false positives) */
+	double recall = (double)tps / ps; /* recall = number of true positives / (true positives + false negatives = all positive samples) */
+
+	fprintf(stderr,"%lf %lf %lf %lf\n",tpr,fpr,prec,recall);
+	return 0;
+}
+
+
+
+int data_stat(data_t *d, int label_col, int cols, int *to_sort_cols)
+{
+	return data_stat_callback(d, data_roc_precall_callback, NULL, label_col, cols, to_sort_cols);
+}
 
 int data_stat_v(data_t *d, int label_col, int cols, ...)
 {
