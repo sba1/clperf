@@ -86,6 +86,7 @@ static char *helper_assert_data(data_t *d)
 		mu_assert(expected_fps[i] == tcb.fps[i]);
 	}
 
+	mu_assert(!data_stat_v(d,0,1,1));
 	return NULL;
 }
 
