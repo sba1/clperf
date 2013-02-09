@@ -1,0 +1,8 @@
+test2.dat is genearted with
+
+ library(e1071)
+ md<-data.frame(x=c(rnorm(100),rnorm(100,mean=2)),y=c(rnorm(100),rnorm(100,mean=2)),l=c(rep("red",100),rep("green",100)))
+ plot(md$x,md$y,col=md$l)
+ pred<-1-predict(m,md[,1:2],type="raw")[,"red"]
+ d<-data.frame(label=as.numeric(md$l=="red"),pred1=pred)
+ write.table(d,file="test2.dat",row.names=F,sep="\t")
