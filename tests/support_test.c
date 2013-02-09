@@ -8,6 +8,31 @@
 
 int tests_run;
 
+struct test_callback_data
+{
+	uint32_t ps[12];
+	uint32_t ns[12];
+	uint32_t tps[12];
+	uint32_t fps[12];
+	uint32_t current;
+};
+
+static int test_data_roc_precall_callback(uint32_t ps, uint32_t ns, uint32_t tps, uint32_t fps, void *userdata)
+{
+	struct test_callback_data *tcd = (struct test_callback_data*)userdata;
+	if (tcd->current < 12)
+	{
+		tcd->ps[tcd->current] = ps;
+		tcd->ns[tcd->current] = ns;
+		tcd->tps[tcd->current] = tps;
+		tcd->fps[tcd->current] = fps;
+		tcd->current++;
+		return 0;
+	}
+	tcd->current++;
+	return 0;
+}
+
 static char *helper_assert_data(data_t *d)
 {
 	double dv;
@@ -45,7 +70,21 @@ static char *helper_assert_data(data_t *d)
 		mu_assert(iv == i);
 	}
 
-	data_stat_v(d,0,1,1);
+
+	int col = 1;
+	struct test_callback_data tcb;
+	memset(&tcb,0,sizeof(tcb));
+	mu_assert(!data_stat_callback(d,test_data_roc_precall_callback,&tcb,0,1,&col));
+	mu_assert(tcb.current == 12);
+	static const char expected_tps[12] = {0,0,0,0,0,0,0,0,0,1,1,2};
+	static const char expected_fps[12] = {1,2,3,4,5,6,7,8,9,9,10,10};
+	for (i=0;i<12;i++)
+	{
+		mu_assert(2 == tcb.ps[i]);
+		mu_assert(10 == tcb.ns[i]);
+		mu_assert(expected_tps[i] == tcb.tps[i]);
+		mu_assert(expected_fps[i] == tcb.fps[i]);
+	}
 
 	return NULL;
 }
@@ -194,10 +233,10 @@ static char *test_fio(void)
 
 static char *run_test_suite(void)
 {
-//	mu_run_test(test_fio);
-//	mu_run_test(test_data_simple);
+	mu_run_test(test_fio);
+	mu_run_test(test_data_simple);
 	mu_run_test(test_data_more_than_a_block);
-//	mu_run_test(test_data_load_from_ascii);
+	mu_run_test(test_data_load_from_ascii);
 	return NULL;
 }
 
