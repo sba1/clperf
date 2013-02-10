@@ -251,9 +251,32 @@ static char *test_data_2(void)
 
 /************************************************************/
 
+static char *test_hist(void)
+{
+	struct hist h;
+	mu_assert(!hist_init(&h,101));
+	mu_assert(0 == hist_get_slot(&h,0.0));
+	mu_assert(100 == hist_get_slot(&h,1.0));
+	mu_assert(50 == hist_get_slot(&h,0.5));
+	mu_assert(0.0 == hist_get_y(&h,0.5));
+
+	hist_put(&h,0.1,0.25);
+	mu_assert(0.25 == hist_get_y(&h,0.4));
+	hist_put(&h,0.9,0.75);
+	mu_assert(0.5 == hist_get_y(&h,0.4));
+
+	hist_average(&h);
+
+	hist_free(&h);
+	return NULL;
+}
+
+/************************************************************/
+
 static char *run_test_suite(void)
 {
 	mu_run_test(test_fio);
+	mu_run_test(test_hist);
 	mu_run_test(test_data_simple);
 	mu_run_test(test_data_more_than_a_block);
 	mu_run_test(test_data_load_from_ascii);

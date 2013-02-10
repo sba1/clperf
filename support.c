@@ -181,13 +181,19 @@ static double hist_get_y(struct hist *h, double x)
 
 	lslot = slot - 1;
 	while (lslot >= 0)
+	{
 		if (h->counts[lslot])
 			break;
+		lslot--;
+	}
 
 	rslot = slot + 1;
 	while (rslot < h->num_counts)
+	{
 		if (h->counts[rslot])
 			break;
+		rslot++;
+	}
 
 	if (lslot < 0 && rslot >= h->num_counts)
 		return 0.0;
