@@ -119,7 +119,7 @@ int main(int argc, char **argv)
 		goto out;
 	}
 
-	if ((err = data_stat(d,label_col,1,&pred_col)))
+	if ((err = data_stat_hist(d,1001,label_col,1,&pred_col)))
 	{
 		fprintf(stderr,"Couldn't determine stat\n");
 		goto out;

@@ -115,6 +115,97 @@ void fio_deinit(struct fio *f)
 
 /**************************************************************/
 
+struct hist
+{
+	int num_counts;
+
+	int *counts;
+	double *y;
+};
+
+static int hist_init(struct hist *h, int counts)
+{
+	int err = -1;
+	h->num_counts = counts;
+	if (!(h->counts = (int*)calloc(counts,sizeof(h->counts[0]))))
+		goto out;
+
+	if (!(h->y = (double*)calloc(counts,sizeof(h->y[0]))))
+		goto out;
+
+	err = 0;
+out:
+	return err;
+}
+
+static int hist_get_slot(struct hist *h, double x)
+{
+	int slot;
+
+	slot = (int)(x * (h->num_counts - 1));
+	slot = MAX(0.0,MIN(slot,h->num_counts - 1));
+
+	return slot;
+}
+
+static void hist_put(struct hist *h, double x, double y)
+{
+	int slot;
+
+	slot = hist_get_slot(h,x);
+	h->counts[slot]++;
+	h->y[slot] += y;
+}
+
+static void hist_average(struct hist *h)
+{
+	int j;
+
+	for (j=0;j<h->num_counts;j++)
+	{
+		int c = h->counts[j];
+		if (c)
+			h->y[j] /= (double)c;
+	}
+}
+
+static double hist_get_y(struct hist *h, double x)
+{
+	int slot;
+	int lslot;
+	int rslot;
+
+	slot = hist_get_slot(h,x);
+	if (h->counts[slot])
+		return h->y[slot];
+
+	lslot = slot - 1;
+	while (lslot >= 0)
+		if (h->counts[lslot])
+			break;
+
+	rslot = slot + 1;
+	while (rslot < h->num_counts)
+		if (h->counts[rslot])
+			break;
+
+	if (lslot < 0 && rslot >= h->num_counts)
+		return 0.0;
+
+	if (lslot < 0) lslot = rslot;
+	else if (rslot >= h->num_counts) rslot = lslot;
+
+	return (h->y[lslot] + h->y[rslot])/2;
+}
+
+static void hist_free(struct hist *h)
+{
+	free(h->counts);
+	free(h->y);
+}
+
+/**************************************************************/
+
 typedef struct
 {
 	/** Memory allocated for the block */
@@ -157,6 +248,11 @@ struct data
 
 	int label_col;
 	int64_t label_sum;
+
+	/* Histograms of various measures */
+	int hist_initialized;
+	struct hist roc;
+	struct hist precall;
 };
 
 /**
@@ -192,6 +288,12 @@ void data_free(data_t *d)
 {
 	if (d)
 	{
+		if (d->hist_initialized)
+		{
+			hist_free(&d->precall);
+			hist_free(&d->roc);
+		}
+
 		if (d->tmp)
 			fclose(d->tmp);
 		free(d->column_datatype);
@@ -1031,104 +1133,46 @@ out:
 	return err;
 }
 
-struct hist
-{
-	int num_counts;
 
-	int *counts;
-	double *y;
-};
-
-static int hist_init(struct hist *h, int counts)
-{
-	int err = -1;
-	h->num_counts = counts;
-	if (!(h->counts = (int*)calloc(counts,sizeof(h->counts[0]))))
-		goto out;
-
-	if (!(h->y = (double*)calloc(counts,sizeof(h->y[0]))))
-		goto out;
-
-	err = 0;
-out:
-	return err;
-}
-
-static void hist_put(struct hist *h, double x, double y)
-{
-	int slot;
-
-	slot = (int)x * (h->num_counts - 1);
-	slot = MAX(0.0,MIN(slot,h->num_counts - 1));
-
-	h->counts[slot]++;
-	h->y[slot] += y;
-}
-
-static void hist_free(struct hist *h)
-{
-	free(h->counts);
-	free(h->y);
-}
-
-struct data_stat_with_hist_data
-{
-	struct hist hist[2];
-};
+/**************************************************************/
 
 static int data_stat_with_hist_callback(uint32_t ps, uint32_t ns, uint32_t tps, uint32_t fps, void *userdata)
 {
-	struct data_stat_with_hist_data *ds = (struct data_stat_with_hist_data*)userdata;
+	data_t *d = (data_t*)userdata;
 	double tpr = (double)tps / ps; /* true positive rate */
 	double fpr = (double)fps / ns; /* false positive rate */
 	double prec = (double)tps / (tps + fps); /* precision = true positives / (number of all positives = (true positives + false positives) */
 	double recall = (double)tps / ps; /* recall = number of true positives / (true positives + false negatives = all positive samples) */
 
-	hist_put(&ds->hist[0],fpr,tpr);
-	hist_put(&ds->hist[1],recall,prec);
+	hist_put(&d->roc, fpr, tpr);
+	hist_put(&d->precall, recall, prec);
 
 	return 0;
 }
 
-int data_stat(data_t *d, int label_col, int cols, int *to_sort_cols)
+int data_stat_hist(data_t *d, int breaks, int label_col, int cols, int *to_sort_cols)
 {
 	int err = -1;
-	int i;
-	const int breaks = 11;
 
-	struct data_stat_with_hist_data ds;
-
-	memset(&ds,0,sizeof(ds));
-
-	for (i=0;i<2;i++)
-	{
-		if ((err = hist_init(&ds.hist[i],breaks)))
-			goto out;
-	}
-
-	if ((err = data_stat_callback(d, data_stat_with_hist_callback, &ds, label_col, cols, to_sort_cols)))
+	if ((err = hist_init(&d->roc,breaks)))
+		goto out;
+	if ((err = hist_init(&d->precall,breaks)))
+		goto out;
+	d->hist_initialized = 1;
+	if ((err = data_stat_callback(d, data_stat_with_hist_callback, d, label_col, cols, to_sort_cols)))
 		goto out;
 
 	/* Average */
-	for (i=0;i<2;i++)
-	{
-		int j;
-		for (j=0;j<breaks;j++)
-		{
-			int c = ds.hist[i].counts[j];
-			if (c)
-				ds.hist[i].y[i] /= (double)c;
-		}
-	}
+	hist_average(&d->roc);
+	hist_average(&d->precall);
+
 	err = 0;
 out:
-	hist_free(&ds.hist[1]);
-	hist_free(&ds.hist[0]);
 	if (err) fprintf(stderr,"err = %d\n",err);
 	return err;
 }
 
-int data_stat_v(data_t *d, int label_col, int cols, ...)
+int data_stat_hist_v(data_t *d, int breaks, int label_col, int cols, ...)
 {
 	int i;
 	int err = -1;
@@ -1140,8 +1184,30 @@ int data_stat_v(data_t *d, int label_col, int cols, ...)
 	for (i=0;i<cols;i++)
 		to_sort_cols[i] = va_arg(vl,int);
 
-	err = data_stat(d, label_col, cols, to_sort_cols);
+	err = data_stat_hist(d, breaks, label_col, cols, to_sort_cols);
 
 	va_end(vl);
 	return err;
 }
+
+/**
+ * Returns the precision value for the given recall.
+ *
+ * @param precision
+ * @param d
+ * @param recall
+ * @return
+ */
+int data_get_precision(double *precision, data_t *d, double recall)
+{
+	int err = -1;
+
+	if (!d->hist_initialized)
+		goto out;
+
+	*precision = hist_get_y(&d->precall,recall);
+	err = 0;
+out:
+	return err;
+}
+

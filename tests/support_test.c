@@ -86,7 +86,7 @@ static char *helper_assert_data(data_t *d)
 		mu_assert(expected_fps[i] == tcb.fps[i]);
 	}
 
-	mu_assert(!data_stat_v(d,0,1,1));
+	mu_assert(!data_stat_hist_v(d,101,0,1,1));
 	return NULL;
 }
 
@@ -232,12 +232,32 @@ static char *test_fio(void)
 
 /************************************************************/
 
+static char *test_data_2(void)
+{
+	double prec;
+	data_t *d;
+	mu_assert(!data_create(&d));
+
+	mu_assert(!data_load_from_ascii(d,"tests/resources/test2.dat"));
+	mu_assert(2 == d->num_columns);
+	mu_assert(200 == d->num_rows);
+
+	mu_assert(!data_stat_hist_v(d,101,0,1,1));
+	mu_assert(!data_get_precision(&prec,d,0));
+	mu_assert(prec == 1.0);
+	data_free(d);
+	return NULL;
+}
+
+/************************************************************/
+
 static char *run_test_suite(void)
 {
 	mu_run_test(test_fio);
 	mu_run_test(test_data_simple);
 	mu_run_test(test_data_more_than_a_block);
 	mu_run_test(test_data_load_from_ascii);
+	mu_run_test(test_data_2);
 	return NULL;
 }
 
