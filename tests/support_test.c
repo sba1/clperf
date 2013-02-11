@@ -243,7 +243,7 @@ static char *test_data_2(void)
 	mu_assert(200 == d->num_rows);
 
 	mu_assert(!data_stat_hist_v(d,101,0,1,1));
-	mu_assert(!data_get_precision(&prec,d,0));
+	mu_assert(!data_get_precision_by_recall(&prec,d,0));
 	mu_assert(prec == 1.0);
 	data_free(d);
 	return NULL;

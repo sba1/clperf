@@ -199,7 +199,7 @@ int main(int argc, char **argv)
 			double x = ((double)j)/(breaks+1);
 			double y;
 
-			if ((err = data_get_precision(&y,d,x)))
+			if ((err = data_get_precision_by_recall(&y,d,x)))
 				goto out;
 			fprintf(stdout,"%g%s",y,(j==breaks-1)?"":",");
 		}
