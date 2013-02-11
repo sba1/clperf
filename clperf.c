@@ -54,7 +54,16 @@ static int getarg(int argc, char **argv, int *argpos, char *arg, const char **va
  */
 static void usage(const char *cmd)
 {
-	printf("%s INPUT LABELCOL PREDCOL\n",cmd);
+	printf(
+			"Usage: %s [OPTION] INPUT LABELCOL PREDCOL\n"
+			"Determines the performance of a classification result that\n"
+			"was stored in a tabular ASCII file.\n"
+			"Available options are:\n"
+			"--help            show this help\n"
+			"--output-format   how the output should look like. Supported\n"
+			"                  values: Rscript (default)\n"
+			"--verbose         verbose output during progress\n"
+			"", cmd);
 }
 
 int main(int argc, char **argv)
