@@ -11,8 +11,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "support.h"
+
+#define D(txt,...) fprintf(stderr,txt,__VA_ARGS__)
 
 #define MIN(a,b) ((a)<(b)?(a):(b))
 #define MAX(a,b) ((a)>(b)?(a):(b))
@@ -110,6 +113,43 @@ void fio_deinit(struct fio *f)
 	if (f->file_was_opened)
 	{
 		fclose(f->file);
+	}
+}
+
+/**************************************************************/
+
+struct progress
+{
+	const char *task;
+
+	uint64_t todo;
+	uint64_t done;
+
+	time_t last_time;
+};
+
+static void progress_init(struct progress *p, const char *task, uint64_t todo)
+{
+	p->done = 0;
+	p->todo = todo;
+	p->task = task;
+
+	time(&p->last_time);
+}
+
+static void progress_done(struct progress *p, uint64_t done)
+{
+	p->done = done;
+}
+
+static void progress_print(struct progress *p, int force)
+{
+	time_t new_time;
+	time(&new_time);
+	if (difftime(p->last_time,new_time))
+	{
+		fprintf(stderr,"%s: %lld%%\n",p->task,(p->todo * 100 / p->done));
+		p->last_time = new_time;
 	}
 }
 
@@ -910,8 +950,12 @@ static int data_sort_callback(data_t *d, int cols, int *to_sort_cols, int (*call
 
 	int err = -1;
 
+	struct progress p;
+
 	int label_col_offset = d->column_offsets[d->label_col];
 	int64_t label_sum = 0;
+
+	progress_init(&p,"Sorting - first pass",d->num_rows);
 
 	/* In place sort using the input block buffer */
 	for (i=0;i<d->num_rows;)
@@ -930,6 +974,9 @@ static int data_sort_callback(data_t *d, int cols, int *to_sort_cols, int (*call
 		}
 
 		i += rows_to_sort;
+
+		progress_done(&p,i);
+		progress_print(&p,0);
 	}
 	d->label_sum = label_sum;
 
@@ -972,12 +1019,16 @@ static int data_sort_callback(data_t *d, int cols, int *to_sort_cols, int (*call
 			}
 		}
 
+		progress_init(&p,"Sorting - second pass",d->num_rows);
+
 		int m;
 
 		/* Merge */
 		for (m=0;m<d->num_rows;m++)
 		{
 			int sk; /* k with smallest entry */
+
+			progress_done(&p,m);
 
 			for (sk=0;sk<k;sk++)
 				if (in_blocks[sk].current_row < rows_per_in_block)
@@ -1009,6 +1060,8 @@ static int data_sort_callback(data_t *d, int cols, int *to_sort_cols, int (*call
 			uint8_t *bskb = &bsk->block[bsk->current_relative_row * d->num_bytes_per_row];
 			callback(d, bskb, user_data);
 			data_advance_head(d,bsk);
+
+			progress_print(&p,0);
 		}
 
 		for (i=0;i<k;i++)
