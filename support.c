@@ -148,7 +148,7 @@ static void progress_print(struct progress *p, int force)
 	time(&new_time);
 	if (difftime(p->last_time,new_time))
 	{
-		fprintf(stderr,"%s: %lld%%\n",p->task,(p->todo * 100 / p->done));
+		fprintf(stderr,"%s: %lld%%\n",p->task,(p->done * 100 / p->todo));
 		p->last_time = new_time;
 	}
 }
