@@ -449,7 +449,7 @@ static int data_initialize_block(block_t *b, data_t *d, uint32_t block_bytes)
 	b->row_offset = 0;
 	b->current_row = 0;
 
-	fprintf(stderr,"Initialized block %p with %d rows of storage\n",b,b->num_rows);
+	D("Initialized block %p with %d rows of storage\n",b,b->num_rows);
 	err = 0;
 out:
 	return err;
@@ -479,7 +479,7 @@ static int data_write_input_block(data_t *d)
 		fprintf(stderr,"Seek failed\n");
 		goto out;
 	}
-	fprintf(stderr,"Writing to %x (offset %d)\n",(unsigned int)ftell(d->tmp),b->row_offset);
+	D("Writing to %x (offset %d)\n",(unsigned int)ftell(d->tmp),b->row_offset);
 	if ((fwrite(b->block,d->num_bytes_per_row,b->num_rows,d->tmp) != b->num_rows ))
 	{
 		fprintf(stderr,"Write failed!\n");
@@ -701,7 +701,7 @@ int data_load_from_ascii(data_t *d, const char *filename)
 
 	linenr = first_data_line;
 
-	fprintf(stderr,"Identified %d columns\n",ncols);
+	D("Identified %d columns\n",ncols);
 
 	while (!(err = fio_read_next_line(&line,&fio)))
 	{
@@ -794,7 +794,7 @@ static int data_read_block_for_row(data_t *d, block_t *b, int row)
 	int err = -1;
 
 	fseek(d->tmp, row * d->num_bytes_per_row, SEEK_SET);
-	fprintf(stderr,"Reading from %x (offset %d)\n", (unsigned int)ftell(d->tmp), row);
+	D("Reading from %x (offset %d)\n", (unsigned int)ftell(d->tmp), row);
 	if (fread(b->block, d->num_bytes_per_row, b->num_rows, d->tmp) == 0)
 	{
 		fprintf(stderr,"Reading row %d failed!\n",row);
@@ -994,7 +994,7 @@ static int data_sort_callback(data_t *d, int cols, int *to_sort_cols, int (*call
 		block_t *in_blocks;
 		int rows_per_in_block = (d->num_rows + k - 1)/k;
 
-		fprintf(stderr,"Taking k=%d fixed blocks containing %d rows\n",k,rows_per_in_block);
+		D("Taking k=%d fixed blocks containing %d rows\n",k,rows_per_in_block);
 
 		if (!(in_blocks = malloc(sizeof(in_blocks[0])*k)))
 		{
