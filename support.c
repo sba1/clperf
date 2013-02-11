@@ -891,14 +891,22 @@ static int data_sort_compare_cb(const void *a, const void *b, void *data)
 
 	for (c=0;c<d->num_to_sort_columns;c++)
 	{
-		int offset = d->column_offsets[d->to_sort_columns[c]];
+		int rc;
+
+		int col = d->to_sort_columns[c];
+		int offset = d->column_offsets[abs(col)];
 
 		double da = *(double*)(&ra[offset]);
 		double db = *(double*)(&rb[offset]);
 
-		if (da > db) return 1;
-		if (da < db) return -1;
+		if (da > db) rc = 1;
+		else if (da < db) rc = -1;
+		else continue;
 
+		if (col < 0)
+			rc *= -1;
+
+		return rc;
 	}
 	return 0;
 }

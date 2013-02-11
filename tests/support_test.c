@@ -70,6 +70,13 @@ static char *helper_assert_data(data_t *d)
 		mu_assert(iv == i);
 	}
 
+	mu_assert(!data_sort_v(d,1,-2));
+	for (i=0;i<12;i++)
+	{
+		mu_assert(!data_get_entry_as_int32(&iv,d,i,4));
+		mu_assert(iv == 11 - i);
+	}
+
 
 	int col = 1;
 	struct test_callback_data tcb;
