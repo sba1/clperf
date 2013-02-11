@@ -15,6 +15,39 @@
 #include "support.h"
 
 /**
+ * Check if the arg of the given position matches the given arg and
+ * return the value in *value on existence.
+ *
+ * @param argc same as in main()
+ * @param argv same as in main()
+ * @param argpos the current position. May be incremented.
+ * @param arg name of the arg
+ * @param value where to store the value
+ * @return 0, if no match, 1 otherwise.
+ */
+static int getarg(int argc, char **argv, int *argpos, char *arg, const char **value)
+{
+	int arglen;
+
+	if (strncmp(argv[*argpos],arg,strlen(arg)))
+		return 0;
+
+	arglen = strlen(arg);
+	if (argv[*argpos][arglen]=='=')
+	{
+		*value = &argv[*argpos][arglen+1];
+	} else
+	{
+		if (*argpos + 1 == argc)
+			return 0;
+		*argpos = *argpos + 1;
+		*value = argv[*argpos];
+	}
+
+	return 1;
+}
+
+/**
  * Displays usage.
  *
  * @param cmd
@@ -34,6 +67,7 @@ int main(int argc, char **argv)
 	int ncols;
 
 	const char *filename = NULL;
+	const char *output_format = NULL;
 	int label_col = -1;
 	int pred_col = -1;
 	int verbose = 0;
@@ -47,6 +81,8 @@ int main(int argc, char **argv)
 
 	for (i=1;i<argc;i++)
 	{
+		if (getarg(argc,argv,&i,"--output-format",&output_format)) continue;
+
 		if (!strcmp("--help",argv[i]) || !strcmp("-h",argv[i]))
 		{
 			usage(cmd);
@@ -77,6 +113,15 @@ int main(int argc, char **argv)
 	if (!filename)
 	{
 		fprintf(stderr,"%s: No input file specified!\n",cmd);
+		goto out;
+	}
+
+	if (!output_format)
+		output_format = "Rscript";
+
+	if (strcmp(output_format,"Rscript"))
+	{
+		fprintf(stderr,"%s: Unknown output format \"%s\"\n",cmd,output_format);
 		goto out;
 	}
 
@@ -119,11 +164,42 @@ int main(int argc, char **argv)
 		goto out;
 	}
 
-	if ((err = data_stat_hist(d,1001,label_col,1,&pred_col)))
+	const int breaks = 1001;
+	if ((err = data_stat_hist(d,breaks,label_col,1,&pred_col)))
 	{
 		fprintf(stderr,"Couldn't determine stat\n");
 		goto out;
 	}
+
+	if (!strcmp("Rscript",output_format))
+	{
+		int j;
+
+		fprintf(stdout,"#/usr/bin/Rscript --vanilla\n");
+		fprintf(stdout,"x<-c(");
+
+		for (j=0;j<breaks;j++)
+		{
+			double x = ((double)j)/(breaks+1);
+			fprintf(stdout,"%g%s",x,(j==breaks-1)?"":",");
+		}
+
+		fprintf(stdout,")\ny<-c(");
+		for (j=0;j<breaks;j++)
+		{
+			double x = ((double)j)/(breaks+1);
+			double y;
+
+			if ((err = data_get_precision(&y,d,x)))
+				goto out;
+			fprintf(stdout,"%g%s",y,(j==breaks-1)?"":",");
+		}
+		fprintf(stdout,")\n");
+		fprintf(stdout,"pdf()\n");
+		fprintf(stdout,"plot(x,y,xlab=\"Recall\",ylab=\"Precision\",xlim=c(0,1),ylim=c(0,1))\n");
+		fprintf(stdout,"dev.off()\n");
+	}
+
 	rc = EXIT_SUCCESS;
 out:
 	if (d) data_free(d);
