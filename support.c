@@ -1217,3 +1217,24 @@ out:
 	return err;
 }
 
+/**
+ * Returns the true positive rate by the given false positive rate.
+ *
+ * @param tpr
+ * @param d
+ * @param fpr
+ * @return
+ */
+int data_get_tpr_by_fpr(double *tpr, data_t *d, double fpr)
+{
+	int err = -1;
+
+	if (!d->hist_initialized)
+		goto out;
+
+	*tpr = hist_get_y(&d->roc,fpr);
+	err = 0;
+out:
+	return err;
+
+}

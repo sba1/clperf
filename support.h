@@ -25,5 +25,6 @@ int data_stat_hist(data_t *d, int breaks, int label_col, int cols, int *to_sort_
 int data_stat_hist_v(data_t *d, int breaks, int label_col, int cols, ...);
 
 int data_get_precision_by_recall(double *precision, data_t *d, double recall);
+int data_get_tpr_by_fpr(double *tpr, data_t *d, double fpr);
 
 #endif

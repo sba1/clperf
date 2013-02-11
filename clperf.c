@@ -66,6 +66,30 @@ static void usage(const char *cmd)
 			"", cmd);
 }
 
+static int clperf_write_data_for_R(FILE *f, data_t *d, const char *var_prefix, const int breaks, int (*function_of_x)(double *, data_t *, double))
+{
+	int j;
+	int err = -1;
+	fprintf(f, "%sx<-c(",var_prefix);
+	for (j = 0; j < breaks; j++) {
+		double x = ((double) j) / (breaks + 1);
+		fprintf(f, "%g%s", x, (j == breaks - 1) ? "" : ",");
+	}
+	fprintf(f, ")\n%sy<-c(",var_prefix);
+	for (j = 0; j < breaks; j++) {
+		double x = ((double) j) / (breaks + 1);
+		double y;
+
+		if ((err = function_of_x(&y, d, x)))
+			goto out;
+		fprintf(f, "%g%s", y, (j == breaks - 1) ? "" : ",");
+	}
+	fprintf(f, ")\n");
+	err = 0;
+out:
+	return err;
+}
+
 int main(int argc, char **argv)
 {
 	int rc;
@@ -182,30 +206,13 @@ int main(int argc, char **argv)
 
 	if (!strcmp("Rscript",output_format))
 	{
-		int j;
-
 		fprintf(stdout,"#/usr/bin/Rscript --vanilla\n");
-		fprintf(stdout,"x<-c(");
-
-		for (j=0;j<breaks;j++)
-		{
-			double x = ((double)j)/(breaks+1);
-			fprintf(stdout,"%g%s",x,(j==breaks-1)?"":",");
-		}
-
-		fprintf(stdout,")\ny<-c(");
-		for (j=0;j<breaks;j++)
-		{
-			double x = ((double)j)/(breaks+1);
-			double y;
-
-			if ((err = data_get_precision_by_recall(&y,d,x)))
-				goto out;
-			fprintf(stdout,"%g%s",y,(j==breaks-1)?"":",");
-		}
-		fprintf(stdout,")\n");
-		fprintf(stdout,"pdf()\n");
-		fprintf(stdout,"plot(x,y,xlab=\"Recall\",ylab=\"Precision\",xlim=c(0,1),ylim=c(0,1))\n");
+		clperf_write_data_for_R(stdout, d, "roc.", breaks, data_get_tpr_by_fpr);
+		clperf_write_data_for_R(stdout, d, "precall.", breaks, data_get_precision_by_recall);
+		fprintf(stdout,"pdf(width=10,height=5)\n");
+		fprintf(stdout,"par(mfrow=c(1,2))\n");
+		fprintf(stdout,"plot(main=\"ROC\",roc.x,roc.y,xlab=\"False positive rate\",ylab=\"True positive rate\",xlim=c(0,1),ylim=c(0,1))\n");
+		fprintf(stdout,"plot(main=\"Precision/Recall\",precall.x,precall.y,xlab=\"Recall\",ylab=\"Precision\",xlim=c(0,1),ylim=c(0,1))\n");
 		fprintf(stdout,"dev.off()\n");
 	}
 
