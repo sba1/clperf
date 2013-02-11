@@ -8,6 +8,7 @@
  * @author Sebastian Bauer <mail@sebastianbauer.info>
  */
 
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -101,8 +102,8 @@ int main(int argc, char **argv)
 
 	const char *filename = NULL;
 	const char *output_format = NULL;
-	int label_col = -1;
-	int pred_col = -1;
+	int label_col = INT_MIN;
+	int pred_col = INT_MIN;
 	int verbose = 0;
 
 	const char *cmd;
@@ -126,15 +127,15 @@ int main(int argc, char **argv)
 		if (!strcmp("--verbose",argv[i]))
 		{
 			verbose = 1;
-		} else if (argv[i][0] == '-')
+		} else if (argv[i][0] == '-' && !isdigit((unsigned char)argv[i][1]))
 		{
 			fprintf(stderr,"%s: Unknown option \"%s\"",filename,argv[i]);
 			goto out;
 		} else
 		{
 			if (!filename) filename = argv[i];
-			else if (label_col == -1) label_col = atoi((argv[i]));
-			else if (pred_col == -1) pred_col = atoi(argv[i]);
+			else if (label_col == INT_MIN) label_col = atoi((argv[i]));
+			else if (pred_col == INT_MIN) pred_col = atoi(argv[i]);
 			else
 			{
 				fprintf(stderr,"%s: Too many arguments!\n",cmd);
@@ -158,13 +159,13 @@ int main(int argc, char **argv)
 		goto out;
 	}
 
-	if (label_col == -1)
+	if (label_col == INT_MIN)
 	{
 		fprintf(stderr,"%s: No label column specified\n",cmd);
 		goto out;
 	}
 
-	if (pred_col == -1)
+	if (pred_col == INT_MIN)
 	{
 		fprintf(stderr,"%s: No prediction column specified\n",cmd);
 		goto out;
@@ -191,7 +192,7 @@ int main(int argc, char **argv)
 		goto out;
 	}
 
-	if (pred_col < 0 || pred_col >= ncols)
+	if (abs(pred_col) >= ncols)
 	{
 		fprintf(stderr,"Specified prediction column out of bounds.\n");
 		goto out;
