@@ -8,6 +8,7 @@
  * @author Sebastian Bauer <mail@sebastianbauer.info>
  */
 
+#include <ctype.h>
 #include <inttypes.h>
 #include <limits.h>
 #include <stdio.h>
