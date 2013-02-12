@@ -1,0 +1,67 @@
+clperf - evaluating classifier performance
+==========================================
+
+The program clperf is a simple command line tool that
+can be used to evaluate the performance of classification
+procedures. As input it accepts an ASCII file that contains
+tab-separated values (TSV) in which one column identifes the
+true label, and another column stores the actual prediction
+value produced by the classifer. The purpose of clperf
+is then to calculate measures such as ROC or Precision/Recall
+on the input.
+
+While there are many extensions for statistcal software
+available that follow a similar goal, clpref has some
+interesting features such as:
+
+ - employs external memory algorithms and thus allows to
+   handle large input files (beyond capablities of the
+   computers physical memory) can be run
+ - it is a command line tool and thus easily scriptable
+ - samples the resulting graph in an equi-distance manner
+ - the result can be written in various formats for further
+   processing
+ - code is written in portable ISO C99
+
+Building
+========
+
+In order to build clperf, simply type
+ make
+after the command prompt. The executable is generated
+in the same directory.
+
+
+Usage
+=====
+
+ clperf [OPTION] INPUT LABELCOL PREDCOL
+
+INPUT is the file name of the TSV
+LABELCOL is the column number (0-based) of the label
+     The label is either a 0 (negative class) or 1 (positive
+     class)
+PREDCOL is the column number (0-based) of the prediction
+     a negative column number indicates that the order is
+     reversed
+
+Currently, clperf writes an R script to the stdout that, when
+invoked within R, draws a ROC and Precision/Recall plot. Note
+that this may change in the future. Refer to the built-in
+help that can be seen via the --help option to learn more
+about possible options and their effect.
+
+
+Contact
+=======
+
+You can reach the author by writting an email to
+ mail@sebastianbauer.info
+
+
+License
+=======
+
+The program clperf is written by Sebastian Bauer and released
+under the conditions of the AGPL. See the License file for
+more details.
