@@ -95,7 +95,12 @@ out:
 
 static int clperf_stat_print_callback(uint32_t ps, uint32_t ns, uint32_t tps, uint32_t fps, void *userdata)
 {
-	fprintf(stdout,"%" PRIu32 "\t%" PRIu32 "\t%" PRIu32 "\t%" PRIu32 "\n", ps, ns, tps, fps);
+	double tpr = (double)tps / ps; /* true positive rate */
+	double fpr = (double)fps / ns; /* false positive rate */
+	double prec = (double)tps / (tps + fps); /* precision = true positives / (number of all positives = (true positives + false positives) */
+	double recall = (double)tps / ps; /* recall = number of true positives / (true positives + false negatives = all positive samples) */
+
+	fprintf(stdout,"%lf %lf %lf %lf\n",tpr,fpr,prec,recall);
 	return 0;
 }
 
