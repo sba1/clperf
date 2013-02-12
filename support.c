@@ -1172,7 +1172,7 @@ int data_sort_v(data_t *d, int cols, ...)
 	return err;
 }
 
-static int data_stat_callback(data_t *d, int (*callback)(uint32_t ps, uint32_t ns, uint32_t tps, uint32_t fps, void *userdata), void *user_data, int label_col, int cols, int *to_sort_cols)
+int data_stat_callback(data_t *d, int (*callback)(uint32_t ps, uint32_t ns, uint32_t tps, uint32_t fps, void *userdata), void *user_data, int label_col, int cols, int *to_sort_cols)
 {
 	int r;
 	int err = -1;

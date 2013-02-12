@@ -8,6 +8,7 @@
  * @author Sebastian Bauer <mail@sebastianbauer.info>
  */
 
+#include <inttypes.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -63,6 +64,7 @@ static void usage(const char *cmd)
 			"--help            show this help\n"
 			"--output-format   how the output should look like. Supported\n"
 			"                  values: Rscript (default)\n"
+			"--no-sampling     disable sampling\n"
 			"--verbose         verbose output during progress\n"
 			"", cmd);
 }
@@ -91,6 +93,12 @@ out:
 	return err;
 }
 
+static int clperf_stat_print_callback(uint32_t ps, uint32_t ns, uint32_t tps, uint32_t fps, void *userdata)
+{
+	fprintf(stdout,"%" PRIu32 "\t%" PRIu32 "\t%" PRIu32 "\t%" PRIu32 "\n", ps, ns, tps, fps);
+	return 0;
+}
+
 int main(int argc, char **argv)
 {
 	int rc;
@@ -105,6 +113,7 @@ int main(int argc, char **argv)
 	int label_col = INT_MIN;
 	int pred_col = INT_MIN;
 	int verbose = 0;
+	int sampling = 1;
 
 	const char *cmd;
 
@@ -127,6 +136,9 @@ int main(int argc, char **argv)
 		if (!strcmp("--verbose",argv[i]))
 		{
 			verbose = 1;
+		} else if (!strcmp("--no-sampling",argv[i]))
+		{
+			sampling = 0;
 		} else if (argv[i][0] == '-' && !isdigit((unsigned char)argv[i][1]))
 		{
 			fprintf(stderr,"%s: Unknown option \"%s\"",filename,argv[i]);
@@ -198,23 +210,30 @@ int main(int argc, char **argv)
 		goto out;
 	}
 
-	const int breaks = 1001;
-	if ((err = data_stat_hist(d,breaks,label_col,1,&pred_col)))
+	if (sampling)
 	{
-		fprintf(stderr,"Couldn't determine stat\n");
-		goto out;
-	}
+		const int breaks = 1001;
+		if ((err = data_stat_hist(d,breaks,label_col,1,&pred_col)))
+		{
+			fprintf(stderr,"Couldn't determine stat\n");
+			goto out;
+		}
 
-	if (!strcmp("Rscript",output_format))
+		if (!strcmp("Rscript",output_format))
+		{
+			fprintf(stdout,"#/usr/bin/Rscript --vanilla\n");
+			clperf_write_data_for_R(stdout, d, "roc.", breaks, data_get_tpr_by_fpr);
+			clperf_write_data_for_R(stdout, d, "precall.", breaks, data_get_precision_by_recall);
+			fprintf(stdout,"pdf(width=10,height=5)\n");
+			fprintf(stdout,"par(mfrow=c(1,2))\n");
+			fprintf(stdout,"plot(main=\"ROC\",roc.x,roc.y,xlab=\"False positive rate\",ylab=\"True positive rate\",xlim=c(0,1),ylim=c(0,1))\n");
+			fprintf(stdout,"plot(main=\"Precision/Recall\",precall.x,precall.y,xlab=\"Recall\",ylab=\"Precision\",xlim=c(0,1),ylim=c(0,1))\n");
+			fprintf(stdout,"dev.off()\n");
+		}
+	} else
 	{
-		fprintf(stdout,"#/usr/bin/Rscript --vanilla\n");
-		clperf_write_data_for_R(stdout, d, "roc.", breaks, data_get_tpr_by_fpr);
-		clperf_write_data_for_R(stdout, d, "precall.", breaks, data_get_precision_by_recall);
-		fprintf(stdout,"pdf(width=10,height=5)\n");
-		fprintf(stdout,"par(mfrow=c(1,2))\n");
-		fprintf(stdout,"plot(main=\"ROC\",roc.x,roc.y,xlab=\"False positive rate\",ylab=\"True positive rate\",xlim=c(0,1),ylim=c(0,1))\n");
-		fprintf(stdout,"plot(main=\"Precision/Recall\",precall.x,precall.y,xlab=\"Recall\",ylab=\"Precision\",xlim=c(0,1),ylim=c(0,1))\n");
-		fprintf(stdout,"dev.off()\n");
+		if ((err = data_stat_callback(d, clperf_stat_print_callback, NULL, label_col, 1, &pred_col)))
+			goto out;
 	}
 
 	rc = EXIT_SUCCESS;
