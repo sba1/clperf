@@ -15,6 +15,7 @@
 #include <string.h>
 
 #include "support.h"
+#include "version.h"
 
 /**
  * Check if the arg of the given position matches the given arg and
@@ -66,6 +67,7 @@ static void usage(const char *cmd)
 			"                  values: Rscript (default)\n"
 			"--no-sampling     disable sampling\n"
 			"--verbose         verbose output during progress\n"
+			"--version         shows the version number\n"
 			"", cmd);
 }
 
@@ -138,7 +140,11 @@ int main(int argc, char **argv)
 			goto out;
 		}
 
-		if (!strcmp("--verbose",argv[i]))
+		if (!strcmp("--version",argv[i]))
+		{
+			printf("clperf %s\n",CLPERF_VERSION);
+			goto out;
+		} else if (!strcmp("--verbose",argv[i]))
 		{
 			verbose = 1;
 		} else if (!strcmp("--no-sampling",argv[i]))
