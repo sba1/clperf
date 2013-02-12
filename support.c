@@ -483,7 +483,7 @@ static int data_write_input_block(data_t *d)
 		fprintf(stderr,"Seek failed\n");
 		goto out;
 	}
-	D("Writing to %x (offset %d)\n",(unsigned int)ftell(d->tmp),b->row_offset);
+	D("Writing to %x (offset %d) length %x\n",(unsigned int)ftell(d->tmp),b->row_offset,d->num_bytes_per_row * b->row_offset);
 	if ((fwrite(b->block,d->num_bytes_per_row,b->num_rows,d->tmp) != b->num_rows ))
 	{
 		fprintf(stderr,"Write failed!\n");
@@ -1004,9 +1004,11 @@ static int data_sort_callback(data_t *d, int cols, int *to_sort_cols, int (*call
 		}
 
 		block_t *in_blocks;
-		int rows_per_in_block = (d->num_rows + k - 1)/k;
+		int rows_per_in_block = d->ib.num_rows;
+		int rows_in_last_block = d->num_rows % rows_per_in_block;
+		if (rows_in_last_block == 0) rows_in_last_block = rows_per_in_block;
 
-		D("Taking k=%d fixed blocks containing %d rows\n",k,rows_per_in_block);
+		D("Taking k=%d fixed blocks containing %d rows, last contains %d rows\n",k,rows_per_in_block,rows_in_last_block);
 
 		if (!(in_blocks = malloc(sizeof(in_blocks[0])*k)))
 		{
@@ -1048,7 +1050,7 @@ static int data_sort_callback(data_t *d, int cols, int *to_sort_cols, int (*call
 
 			for (i=sk;i<k;i++)
 			{
-				if (in_blocks[i].current_row >= rows_per_in_block)
+				if (in_blocks[i].current_row >= rows_per_in_block || (i == k-1 && in_blocks[i].current_row >= rows_in_last_block))
 					continue;
 
 				if (in_blocks[i].current_relative_row == in_blocks[i].num_rows)

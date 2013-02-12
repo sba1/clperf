@@ -1,5 +1,6 @@
 #define _GNU_SOURCE
 
+#include <float.h>
 #include <stdlib.h>
 #include <stdio.h>
 
@@ -242,12 +243,25 @@ static char *test_fio(void)
 static char *test_data_2(void)
 {
 	double prec;
+	double lv = DBL_MIN;
 	data_t *d;
+	int i;
+
 	mu_assert(!data_create(&d));
+	d->ib_bytes = 84;
 
 	mu_assert(!data_load_from_ascii(d,"tests/resources/test2.dat"));
 	mu_assert(2 == d->num_columns);
 	mu_assert(200 == d->num_rows);
+	mu_assert(!data_sort_v(d,1,1));
+
+	for (i=0;i<200;i++)
+	{
+		double v;
+		mu_assert(!data_get_entry_as_double(&v,d,i,1));
+		mu_assert(lv <= v);
+		lv = v;
+	}
 
 	mu_assert(!data_stat_hist_v(d,101,0,1,1));
 	mu_assert(!data_get_precision_by_recall(&prec,d,0));
